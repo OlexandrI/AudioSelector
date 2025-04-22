@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="color-scheme" content="dark light">
+    <title>Extension Options</title>
+    <style>
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th, td {
+        border: 0px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        font-weight: bold;
+      }
+      input[type="text"] {
+        cursor: pointer;
+      }
+      .remove-button {
+        color: red;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <form>
+      <table>
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>Ctrl</th>
+            <th>Alt</th>
+            <th>Shift</th>
+            <th>Key</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-command="select-audio-device">
+            <td>Select Audio Device</td>
+            <td><input type="checkbox" id="select-audio-ctrl"></td>
+            <td><input type="checkbox" id="select-audio-alt" checked></td>
+            <td><input type="checkbox" id="select-audio-shift"></td>
+            <td><input type="text" id="select-audio-key" class="shortcut" readonly value="A"></td>
+          </tr>
+          <tr data-command="gmeet-switch-tab">
+            <td>Google Meet: Switch Tab</td>
+            <td><input type="checkbox" id="gmeet-switch-tab-ctrl"></td>
+            <td><input type="checkbox" id="gmeet-switch-tab-alt" checked></td>
+            <td><input type="checkbox" id="gmeet-switch-tab-shift"></td>
+            <td><input type="text" id="gmeet-switch-tab-key" class="shortcut" readonly value="U"></td>
+          </tr>
+          <tr data-command="gmeet-toggle-microphone">
+            <td>Google Meet: Toggle Microphone</td>
+            <td><input type="checkbox" id="gmeet-toggle-mic-ctrl" checked></td>
+            <td><input type="checkbox" id="gmeet-toggle-mic-alt"></td>
+            <td><input type="checkbox" id="gmeet-toggle-mic-shift" checked></td>
+            <td><input type="text" id="gmeet-toggle-mic-key" class="shortcut" readonly value="U"></td>
+          </tr>
+        </tbody>
+      </table>
+      <br />
+      <button id="reset" type="submit">Reset</button>
+      <button id="settings">Open Pattern Settings</button>
+
+    </form>
+    <script src="options.js"></script>
+  </body>
+</html>
