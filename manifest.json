@@ -22,21 +22,28 @@
   "commands": {
     "select-audio-device": {
       "suggested_key": {
-        "default": "Ctrl+Alt+A"
+        "default": "Ctrl+Shift+A",
+        "mac": "Command+Shift+A"
       },
       "description": "Change the audio output device for the current tab"
     },
-    "gmeet-switch-tab": {
-      "suggested_key": {
-        "default": "Ctrl+Alt+U"
-      },
-      "description": "Switch to the next google meet tab"
-    },
-    "gmeet-toggle-microphone": {
+    "meet-switch-tab": {
       "suggested_key": {
         "default": "Ctrl+Shift+U"
       },
+      "description": "Switch to the next google meet tab"
+    },
+    "meet-join": {
+      "description": "Join the meeting if only one tab is open and switch to it"
+    },
+    "meet-toggle-microphone": {
+      "suggested_key": {
+        "default": "Alt+Shift+U"
+      },
       "description": "Mute/Unmute the microphone for the active google meet tab (without switching)"
+    },
+    "meet-toggle-camera": {
+      "description": "Mute/Unmute the camera for the active google meet tab (without switching)"
     }
   },
   "background": {

@@ -22,9 +22,9 @@ function GMeet_joinMeeting() {
     const joinBtn = document.querySelector(JOIN_BTN_SELECTOR);
     if (joinBtn) {
         joinBtn.click();
-        console.log("Joining meeting...");
+        console.log("[AudioSelector] Joining meeting...");
     } else {
-        console.log("Already in a meeting or join button not found.");
+        console.log("[AudioSelector] Already in a meeting or join button not found.");
     }
 }
 
@@ -46,7 +46,7 @@ function GMeet_getMutedBtns() {
             result.micBtn = result.micBtn || Btns[0];
             result.camBtn = result.camBtn || Btns[2];
         } else {
-            console.warn('Mute buttons not found!');
+            console.warn('[AudioSelector] Mute buttons not found!');
             return null;
         }
     }
@@ -80,10 +80,10 @@ function GMeet_switchMic() {
     const btns = GMeet_getMutedBtns();
     if (btns && btns.micBtn) {
         btns.micBtn.click();
-        console.log("Switching mic state...");
+        console.log("[AudioSelector] Switching mic state...");
         return btns.micBtn.parentElement.dataset.isMuted === 'true';
     } else {
-        console.warn("Mic button not found!");
+        console.warn("[AudioSelector] Mic button not found!");
     }
 
     return false;
@@ -95,10 +95,10 @@ function GMeet_switchCam() {
     const btns = GMeet_getMutedBtns();
     if (btns && btns.camBtn) {
         btns.camBtn.click();
-        console.log("Switching camera state...");
+        console.log("[AudioSelector] Switching camera state...");
         return btns.camBtn.parentElement.dataset.isMuted === 'true';
     } else {
-        console.warn("Camera button not found!");
+        console.warn("[AudioSelector] Camera button not found!");
     }
     return false;
 }

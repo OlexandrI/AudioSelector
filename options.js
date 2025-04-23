@@ -1,3 +1,5 @@
+const API = typeof browser !== "undefined" ? browser : chrome; // For compatibility with Chrome and Firefox
+const IS_CHROME = typeof chrome !== "undefined" && typeof browser === "undefined";
 const SHOW_INPUT = false;
 
 let managers = [];
@@ -53,7 +55,7 @@ class ShortcutManager {
     }
 
     async loadShortcut() {
-        const commands = await browser.commands.getAll();
+        const commands = await API.commands.getAll();
         const command = commands.find((cmd) => cmd.name === this.commandName);
         if (command) {
             const [modifiers, key] = command.shortcut.split("+").reduce(
@@ -77,7 +79,7 @@ class ShortcutManager {
     async saveShortcut() {
         const shortcut = this.getShortcut();
         if (shortcut) {
-            await browser.commands.update({
+            await API.commands.update({
                 name: this.commandName,
                 shortcut: shortcut,
             });
@@ -85,7 +87,7 @@ class ShortcutManager {
     }
 
     async resetShortcut() {
-        await browser.commands.reset(this.commandName);
+        await API.commands.reset(this.commandName);
         await this.loadShortcut();
     }
 
@@ -196,7 +198,7 @@ class DevicePatternManager {
     }
 
     static async loadAll() {
-        let data = await browser.storage.local.get("patterns");
+        let data = await API.storage.local.get("patterns");
         data = data.patterns || [];
         const tbody = document.querySelector("#device-pattern-table tbody");
         if (tbody) {
@@ -211,7 +213,7 @@ class DevicePatternManager {
 
     static async saveAll() {
         const data = patterns.filter((manager) => !manager.removed).map((manager) => manager.getPatternData());
-        await browser.storage.local.set({ patterns: data });
+        await API.storage.local.set({ patterns: data });
     }
 
     static createPatternRow(pattern = {}) {
@@ -261,7 +263,7 @@ class DevicePatternManager {
     }
 
     static async resetAll() {
-        await browser.storage.local.clear();
+        await API.storage.local.clear();
         const tbody = document.querySelector("#device-pattern-table tbody");
         if (tbody) {
             while (tbody.firstChild) {
@@ -284,15 +286,20 @@ function openSettingsPage() {
         width: 540,
         height: 480,
     };
-    browser.windows.create(createData);
+    API.windows.create(createData);
 }
 
 /**
  * Update the UI: set the value of the shortcut textbox.
  */
 async function updateUI() {
+    if (IS_CHROME) {
+        const shortcutSetup = document.querySelector("#shortcut-settings");
+        shortcutSetup.remove();
+    }
+
     DevicePatternManager.loadAll([]);
-    ShortcutManager.loadAll();
+    if (!IS_CHROME) ShortcutManager.loadAll();
 
     // Add new pattern row
     if (document.querySelector("#add-pattern")) {
