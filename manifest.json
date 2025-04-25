@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Audio Selector",
-  "version": "0.1",
+  "version": "0.2",
   "description": "Allows you to change the audio output device for tabs.",
   "homepage_url": "https://github.com/OlexandrI/AudioSelector/",
   "icons": {
@@ -10,8 +10,7 @@
     "64": "icons/icon-64.png",
     "96": "icons/icon-96.png",
     "128": "icons/icon-128.png",
-    "256": "icons/icon-256.png",
-    "512": "icons/icon-512.png"
+    "256": "icons/icon-256.png"
   },
   "permissions": [
     "storage",
@@ -22,14 +21,13 @@
   "commands": {
     "select-audio-device": {
       "suggested_key": {
-        "default": "Ctrl+Shift+A",
-        "mac": "Command+Shift+A"
+        "default": "Ctrl+Alt+A"
       },
       "description": "Change the audio output device for the current tab"
     },
     "meet-switch-tab": {
       "suggested_key": {
-        "default": "Ctrl+Shift+U"
+        "default": "Ctrl+Shift+G"
       },
       "description": "Switch to the next google meet tab"
     },
@@ -38,7 +36,7 @@
     },
     "meet-toggle-microphone": {
       "suggested_key": {
-        "default": "Alt+Shift+U"
+        "default": "Alt+Shift+G"
       },
       "description": "Mute/Unmute the microphone for the active google meet tab (without switching)"
     },
@@ -74,7 +72,8 @@
     "*://*/*"
   ],
   "options_ui": {
-    "page": "options.html"
+    "page": "options.html",
+    "open_in_tab": true
   },
   "browser_specific_settings": {
     "gecko": {

@@ -1,222 +1,15 @@
 const API = typeof browser !== "undefined" ? browser : chrome; // For compatibility with Chrome and Firefox
 const IS_CHROME = typeof chrome !== "undefined" && typeof browser === "undefined";
-const SHOW_INPUT = false;
+const DATA_PATTERNS = "patterns";
 
-let managers = [];
-let patterns = [];
+let PatternsManager = null;
 
-class ShortcutManager {
-    constructor(rowElement) {
-        this.rowElement = rowElement;
-        this.ctrlCheckbox = rowElement.querySelector(
-            'input[type="checkbox"][id$="-ctrl"]'
-        );
-        this.altCheckbox = rowElement.querySelector(
-            'input[type="checkbox"][id$="-alt"]'
-        );
-        this.shiftCheckbox = rowElement.querySelector(
-            'input[type="checkbox"][id$="-shift"]'
-        );
-        this.keyInput = rowElement.querySelector('input[type="text"]');
-        this.commandName = rowElement.dataset.command;
-        this.autosave = true;
-
-        this.init();
+class AudioDevicePattern {
+    static useSelectList() {
+        return navigator.mediaDevices?.selectAudioOutput ? false : true;
     }
 
-    init() {
-        // Add event listener for key input
-        this.keyInput.addEventListener("click", () => this.listenForKey());
-    }
-
-    listenForKey() {
-        this.keyInput.value = ""; // Clear the current value
-        const keyListener = (event) => {
-            if (
-                event.key !== "Control" &&
-                event.key !== "Alt" &&
-                event.key !== "Shift"
-            ) {
-                this.keyInput.value = event.key.toUpperCase();
-                document.removeEventListener("keydown", keyListener);
-                if (this.autosave) this.saveShortcut(); // Save the shortcut
-            }
-        };
-        document.addEventListener("keydown", keyListener);
-    }
-
-    getShortcut() {
-        const modifiers = [];
-        if (this.ctrlCheckbox.checked) modifiers.push("Ctrl");
-        if (this.altCheckbox.checked) modifiers.push("Alt");
-        if (this.shiftCheckbox.checked) modifiers.push("Shift");
-        const key = this.keyInput.value;
-        return modifiers.length > 0 && key ? `${modifiers.join("+")}+${key}` : "";
-    }
-
-    async loadShortcut() {
-        const commands = await API.commands.getAll();
-        const command = commands.find((cmd) => cmd.name === this.commandName);
-        if (command) {
-            const [modifiers, key] = command.shortcut.split("+").reduce(
-                (acc, part) => {
-                    if (["Ctrl", "Alt", "Shift"].includes(part)) {
-                        acc[0].push(part);
-                    } else {
-                        acc[1] = part;
-                    }
-                    return acc;
-                },
-                [[], ""]
-            );
-            this.ctrlCheckbox.checked = modifiers.includes("Ctrl");
-            this.altCheckbox.checked = modifiers.includes("Alt");
-            this.shiftCheckbox.checked = modifiers.includes("Shift");
-            this.keyInput.value = key || "";
-        }
-    }
-
-    async saveShortcut() {
-        const shortcut = this.getShortcut();
-        if (shortcut) {
-            await API.commands.update({
-                name: this.commandName,
-                shortcut: shortcut,
-            });
-        }
-    }
-
-    async resetShortcut() {
-        await API.commands.reset(this.commandName);
-        await this.loadShortcut();
-    }
-
-    static loadAll() {
-        const rows = document.querySelectorAll("tr[data-command]");
-        managers = Array.from(rows).map((row) => new ShortcutManager(row));
-        managers.forEach((manager) => manager.loadShortcut());
-    }
-
-    static async saveAll() {
-        for (const manager of managers) {
-            await manager.saveShortcut();
-        }
-    }
-
-    static resetAll() {
-        for (const manager of managers) {
-            manager.resetShortcut();
-        }
-    }
-}
-
-class DevicePatternManager {
-    constructor(pattern = {}, rowElement = null) {
-        if (!rowElement) {
-            rowElement = DevicePatternManager.createPatternRow(pattern);
-            const tbody = document.querySelector("#device-pattern-table tbody");
-            if (tbody) tbody.appendChild(rowElement);
-        }
-        this.rowElement = rowElement;
-        this.urlInput = rowElement.querySelector(".url-pattern");
-        if (SHOW_INPUT) this.audioInputSelect = rowElement.querySelector(".audio-input");
-        this.audioOutputSelect = rowElement.querySelector(".audio-output");
-        this.removeButton = rowElement.querySelector(".remove-button");
-        this.urlInput.value = pattern.urlPattern || "";
-        if (SHOW_INPUT) this.audioInputSelect.value = pattern.audioInput || "Default";
-        this.audioOutputSelect.value = pattern.audioOutput || "Default";
-        this.pattern = pattern;
-        this.removed = false;
-        this.autosave = true;
-
-        this.init();
-    }
-
-    init() {
-        this.removeButton.addEventListener("click", () => this.removeRow());
-        this.urlInput.addEventListener("input", () => this.onChange());
-        if (SHOW_INPUT) this.audioInputSelect.addEventListener("click", () => this.listenForInputDevice());
-        this.audioOutputSelect.addEventListener("click", () => this.listenForOutputDevice());
-    }
-
-    listenForInputDevice() {
-        if (!navigator.mediaDevices?.selectAudioOutput) {
-            return;
-        }
-        const self = this;
-        navigator.mediaDevices.selectAudioOutput().then((device) => {
-            if (device) {
-                self.audioInputSelect.value = device.label;
-                self.pattern.audioInput = device.lable;
-                self.pattern.audioInputId = device.deviceId;
-                self.onChange();
-            }
-        });
-    }
-
-    listenForOutputDevice() {
-        if (!navigator.mediaDevices?.selectAudioOutput) {
-            return;
-        }
-        const self = this;
-        navigator.mediaDevices.selectAudioOutput().then((device) => {
-            if (device) {
-                self.audioOutputSelect.value = device.label;
-                self.pattern.audioOutput = device.lable;
-                self.pattern.audioOutputId = device.deviceId;
-                self.onChange();
-            }
-        });
-    }
-
-    onChange() {
-        if (this.autosave) {
-            DevicePatternManager.saveAll();
-        }
-    }
-
-    removeRow() {
-        this.rowElement.remove();
-        for (let i = 0; i < patterns.length; i++) {
-            if (patterns[i] === this) {
-                patterns.splice(i, 1);
-                break;
-            }
-        }
-        this.removed = true;
-        this.onChange();
-    }
-
-    getPatternData() {
-        return {
-            urlPattern: this.urlInput.value,
-            audioInput: this.audioInputSelect?.value || this.pattern?.audioInput || "Default",
-            audioInputId: this.pattern.audioInputId,
-            audioOutput: this.audioOutputSelect?.value || this.pattern?.audioOutput || "Default",
-            audioOutputId: this.pattern.audioOutputId
-        };
-    }
-
-    static async loadAll() {
-        let data = await API.storage.local.get("patterns");
-        data = data.patterns || [];
-        const tbody = document.querySelector("#device-pattern-table tbody");
-        if (tbody) {
-            while (tbody.firstChild) {
-                tbody.removeChild(tbody.lastChild);
-            }
-        }
-        patterns = data.map(
-            (pattern) => new DevicePatternManager(pattern)
-        );
-    }
-
-    static async saveAll() {
-        const data = patterns.filter((manager) => !manager.removed).map((manager) => manager.getPatternData());
-        await API.storage.local.set({ patterns: data });
-    }
-
-    static createPatternRow(pattern = {}) {
+    static makeHTMLRow(pattern = {}, devices = {}) {
         const row = document.createElement("tr");
 
         // Use input fields for devices
@@ -225,30 +18,25 @@ class DevicePatternManager {
         const urlInput = document.createElement("input");
         urlInput.type = "text";
         urlInput.className = "url-pattern";
-        urlInput.value = pattern.urlPattern || "Default";
+        urlInput.value = pattern.urlPattern || "*://*/*";
         urlCell.appendChild(urlInput);
         row.appendChild(urlCell);
 
-        if (SHOW_INPUT) {
-            const inputCell = document.createElement("td");
-            inputCell.className = "field-input";
-            const inputField = document.createElement("input");
-            inputField.type = "text";
-            inputField.className = "audio-input";
-            inputField.readOnly = true;
-            inputField.value = pattern.audioInput || "Default";
-            inputCell.appendChild(inputField);
-            row.appendChild(inputCell);
-        }
-
         const outputCell = document.createElement("td");
         outputCell.className = "field-output";
-        const outputField = document.createElement("input");
-        outputField.type = "text";
-        outputField.className = "audio-output";
-        outputField.readOnly = true;
-        outputField.value = pattern.audioOutput || "Default";
-        outputCell.appendChild(outputField);
+        if (AudioDevicePattern.useSelectList()) {
+            // Fallback to select element for audio output
+            const outputSelect = document.createElement("select");
+            outputSelect.className = "audio-output";
+            outputCell.appendChild(outputSelect);
+        } else {
+            const outputField = document.createElement("input");
+            outputField.type = "text";
+            outputField.className = "audio-output";
+            outputField.readOnly = true;
+            outputField.value = pattern.audioOutput || "Default";
+            outputCell.appendChild(outputField);
+        }
         row.appendChild(outputCell);
 
         const actionsCell = document.createElement("td");
@@ -262,77 +50,219 @@ class DevicePatternManager {
         return row;
     }
 
-    static async resetAll() {
-        await API.storage.local.clear();
-        const tbody = document.querySelector("#device-pattern-table tbody");
-        if (tbody) {
-            while (tbody.firstChild) {
-                tbody.removeChild(tbody.lastChild);
+    constructor(pattern = {}, devices = {audiooutput: []}) {
+        this.pattern = pattern;
+        this.rowElement = null;
+        this.eventBinded = false;
+        this.remove = false;
+        this.devices = devices;
+    }
+
+    init(tbodyElement) {
+        if (this.rowElement) {
+            this.rowElement.remove();
+        }
+        this.rowElement = AudioDevicePattern.makeHTMLRow(this.pattern, this.devices);
+        if (tbodyElement) {
+            tbodyElement.appendChild(this.rowElement);
+            this.updateDevices(this.devices);
+        }
+        this.eventBinded = false;
+        this.initEvents();
+    }
+
+    getPatternData() {
+        return {
+            urlPattern: this.pattern.urlPattern,
+            audioOutput: this.pattern.audioOutput || "Default",
+            audioOutputId: this.pattern.audioOutputId || null,
+        };
+    }
+
+    getElements () {
+        return {
+            urlInput: this.rowElement ? this.rowElement.querySelector(".url-pattern") : null,
+            audioOutputSelect: this.rowElement ? this.rowElement.querySelector(".audio-output") : null,
+            removeButton: this.rowElement ? this.rowElement.querySelector(".remove-button") : null,
+        };
+    }
+
+    initEvents() {
+        if (this.eventBinded) return;
+        if (this.rowElement) {
+            const self = this;
+            this.eventBinded = true;
+
+            const { urlInput, audioOutputSelect, removeButton } = this.getElements();
+
+            if (urlInput) {
+                urlInput.addEventListener("input", () => {
+                    self.pattern.urlPattern = urlInput.value;
+                    self.onChange();
+                });
+            }
+            if (audioOutputSelect) {
+                if (AudioDevicePattern.useSelectList()) {
+                    audioOutputSelect.addEventListener("change", (e) => self.listenForOutputDeviceSelection(audioOutputSelect, e));
+                } else {
+                    audioOutputSelect.addEventListener("click", (e) => self.listenForOutputDeviceRequest(audioOutputSelect, e));
+                }
+            }
+            if (removeButton) {
+                removeButton.addEventListener("click", (e) => self.listenForRemove(removeButton, e));
             }
         }
-        patterns = []; // Clear the patterns array
+    }
+
+    listenForOutputDeviceRequest(elem, event) {
+        const self = this;
+        navigator.mediaDevices.selectAudioOutput().then((device) => {
+            if (device) {
+                self.pattern.audioOutput = device.label || "Default";
+                self.pattern.audioOutputId = device.deviceId;
+                self.onChange();
+            }
+        });
+    }
+
+    listenForOutputDeviceSelection(elem, event) {
+        this.pattern.audioOutput = elem.options[elem.selectedIndex].text;
+        this.pattern.audioOutputId = elem.value;
+        this.onChange();
+    }
+
+    listenForRemove(elem, event) {
+        if (this.remove) return; // Prevent double removal
+        if (this.rowElement) {
+            this.rowElement.remove();
+            this.remove = true; // Mark the pattern for removal
+            this.onChange();
+        }
+    }
+
+    updateDevices(devices) {
+        if (!devices || !devices.audiooutput) return;
+        this.devices = devices;
+        // Check - maybe id changed
+        if (this.pattern.audioOutput) {
+            const selectedDevice = this.devices.audiooutput.find((device) => device.label === this.pattern.audioOutput);
+            if (selectedDevice) {
+                this.pattern.audioOutputId = selectedDevice.deviceId;
+            }
+        }
+        if (this.rowElement && AudioDevicePattern.useSelectList()) {
+            const audioOutputSelect = this.getElements().audioOutputSelect;
+            if (audioOutputSelect) {
+                while (audioOutputSelect.firstChild) {
+                    audioOutputSelect.removeChild(audioOutputSelect.lastChild);
+                }
+                const defaultOption = document.createElement("option");
+                defaultOption.value = "Default";
+                defaultOption.textContent = "Default";
+                audioOutputSelect.appendChild(defaultOption);
+                devices.audiooutput.forEach((device) => {
+                    const option = document.createElement("option");
+                    option.value = device.deviceId;
+                    option.textContent = device.label || device.deviceId;
+                    audioOutputSelect.appendChild(option);
+                });
+                this.onChange(); // Update the selected value after populating the options
+            }
+        }
+    }
+
+    onChange() {
+        if (this.rowElement) {
+            const { urlInput, audioOutputSelect, removeButton } = this.getElements();
+            if (urlInput) {
+                urlInput.value = this.pattern.urlPattern || "*://*/*";
+            }
+            if (audioOutputSelect) {
+                if (audioOutputSelect.tagName === "INPUT") {
+                    audioOutputSelect.value = this.pattern.audioOutput || "Default";
+                } else if (audioOutputSelect.tagName === "SELECT") {
+                    const options = Array.from(audioOutputSelect.options);
+                    let selectedOption = options.find((option) => option.value === this.pattern.audioOutputId);
+                    if (!selectedOption) {
+                        selectedOption = options.find((option) => option.textContent === this.pattern.audioOutput);
+                    }
+                    if (selectedOption) {
+                        audioOutputSelect.value = selectedOption.value;
+                    } else {
+                        audioOutputSelect.value = "Default";
+                    }
+                }
+            }
+        }
+        if (PatternsManager) PatternsManager.saveAll();
     }
 }
 
-async function saveAll() {
-    await ShortcutManager.saveAll();
-    await DevicePatternManager.saveAll();
-}
+class AudioDeviceManager {
+    constructor()
+    {
+        this.patterns = [];
+        this.devices = {audiooutput: []};
+        this.tbody = null;
+    }
 
-function openSettingsPage() {
-    let createData = {
-        type: "detached_panel",
-        url: "settings.html",
-        width: 540,
-        height: 480,
-    };
-    API.windows.create(createData);
+    async init(tableElement) {
+        this.devices = await AUDIO_EnumareteDevices();
+        let data = await API.storage.local.get(DATA_PATTERNS);
+        data = data.patterns || [];
+        this.patterns = data.map((pattern) => new AudioDevicePattern(pattern, this.devices));
+        if (tableElement) {
+            this.tbody = tableElement.querySelector("tbody");
+            if (this.tbody) {
+                while (this.tbody.firstChild) {
+                    this.tbody.removeChild(this.tbody.lastChild);
+                }
+            }
+            this.patterns.forEach((pattern) => pattern.init(this.tbody));
+        }
+    }
+
+    addNewPattern() {
+        const newPattern = new AudioDevicePattern({}, this.devices);
+        this.patterns.push(newPattern);
+        if (this.tbody) {
+            newPattern.init(this.tbody);
+        }
+    }
+
+    async saveAll() {
+        this.patterns = this.patterns.filter((pattern) => !pattern.remove);
+        const data = {};
+        data[DATA_PATTERNS] = this.patterns.map((pattern) => pattern.getPatternData());
+        await API.storage.local.set(data);
+    }
+
+    async updateDevices() {
+        this.devices = await AUDIO_EnumareteDevices();
+        this.patterns.forEach((pattern) => pattern.updateDevices(this.devices));
+    }
 }
 
 /**
  * Update the UI: set the value of the shortcut textbox.
  */
 async function updateUI() {
-    if (IS_CHROME) {
-        const shortcutSetup = document.querySelector("#shortcut-settings");
-        shortcutSetup.remove();
+
+    PatternsManager = new AudioDeviceManager();
+    const tableElement = document.querySelector("#device-pattern-table");
+    if (tableElement) {
+        await PatternsManager.init(tableElement);
     }
 
-    DevicePatternManager.loadAll([]);
-    if (!IS_CHROME) ShortcutManager.loadAll();
-
-    // Add new pattern row
-    if (document.querySelector("#add-pattern")) {
-        document.querySelector("#add-pattern").addEventListener("click", () => {
-            patterns.push(new DevicePatternManager());
-            DevicePatternManager.saveAll();
+    const addButton = document.querySelector("#add-pattern");
+    if (addButton) {
+        addButton.addEventListener("click", () => {
+            PatternsManager.addNewPattern();
         });
     }
 
-    if (!SHOW_INPUT) {
-        const inputSelect = document.querySelectorAll(".field-input");
-        for (let i = 0; i < inputSelect.length; i++) {
-            inputSelect[i].remove();
-        }
-    }
-
-    if (document.querySelector("#save")) {
-        document.querySelector("#save").addEventListener("click", saveAll);
-    }
-
-    if (document.querySelector("#reset")) {
-        document.querySelector("#reset").addEventListener("click", async () => {
-            await ShortcutManager.resetAll();
-            //await DevicePatternManager.resetAll();
-        });
-    }
-
-    if (document.querySelector("#settings")) {
-        document.querySelector("#settings").addEventListener("click", openSettingsPage);
-    }
-
-    if (!navigator.mediaDevices.selectAudioOutput) {
-        let warnElem = document.querySelector("#audio-select-warn");
+    if (!IS_CHROME && !navigator.mediaDevices.selectAudioOutput) {
+        let warnElem = document.querySelector("#audio-select-warn-firefox");
         if (warnElem) {
             warnElem.style.display = "block";
         }
@@ -343,3 +273,11 @@ async function updateUI() {
  * Update the UI when the page loads.
  */
 document.addEventListener("DOMContentLoaded", updateUI);
+if (navigator?.mediaDevices)
+{
+    navigator.mediaDevices.ondevicechange = (event) => {
+        if (PatternsManager) {
+            PatternsManager.updateDevices();
+        }
+    };
+}

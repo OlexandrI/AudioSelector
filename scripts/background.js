@@ -2,6 +2,7 @@
 const IS_FIREFOX = typeof browser !== "undefined" && browser.runtime && browser.runtime.getBrowserInfo;
 const IS_CHROME = typeof chrome !== "undefined";
 const API = typeof browser !== "undefined" ? browser : chrome;
+const DATA_PATTERNS = "patterns";
 
 const Helpers = {
   activeTab: async function () {
@@ -93,8 +94,130 @@ const Helpers = {
     });
 
     return result;
+  },
+
+  openTab: function (url) {
+    const createData = {
+      url: url,
+      active: true,
+    };
+    return API.tabs.create(createData).catch((error) => {
+      console.error(`Error creating tab with URL ${url}: ${error}`);
+      return null;
+    });
+  },
+
+  getStorageValue: async function (key, defaultValue = null) {
+    try {
+      return await API.storage.local.get(key).then((data) => {
+        if (data && data[key] !== undefined) {
+          return data[key];
+        }
+        return defaultValue;
+      });
+    } catch(error) {
+      console.error(`Error getting storage value for key ${key}: ${error}`);
+    };
+
+    return defaultValue;
+  },
+
+  store: {},
+  get: function(key, defaultValue = null) {
+    return Helpers.store[key] !== undefined ? Helpers.store[key] : defaultValue;
+  },
+  set: function(key, value) {
+    Helpers.store[key] = value;
+  },
+  add: function(key, value) {
+    if (Array.isArray(Helpers.store[key])) {
+      Helpers.store[key].push(value);
+    } else {
+      Helpers.store[key] = [value];
+    }
+  },
+  has: function(key, value = null) {
+    if (value === null) {
+      return Helpers.store[key] !== undefined;
+    }
+    if (Array.isArray(Helpers.store[key])) {
+      return Helpers.store[key].includes(value);
+    }
+    return false;
+  },
+  remove: function(key, value = null) {
+    if (value === null) {
+      delete Helpers.store[key];
+    } else if (Array.isArray(Helpers.store[key])) {
+      const index = Helpers.store[key].indexOf(value);
+      if (index !== -1) {
+        Helpers.store[key].splice(index, 1);
+      }
+    }
+  },
+};
+
+const SelectAudio = {
+  enumarateDevices: async function (tab) {
+    return Helpers.executeInTab(tab, () => {
+      return AUDIO_EnumareteDevices();
+    });
+  },
+
+  selectDevice: async function (tab = null, label = "", id = "", saveAsManual = true) {
+    const resolvedTab = await Helpers.resolveTab(tab);
+    // Check if we have stored another id for this tab
+    if (label && id) {
+      const storedId = Helpers.get("deviceId_per_tab_" + resolvedTab.id + label, null);
+      if (storedId) {
+        console.info(`Using stored id "${storedId}" for device "${label}" (${id}) for tab "${resolvedTab.title}"`);
+        id = storedId;
+      }
+    }
+    const result = await Helpers.executeInTab(resolvedTab, (label, id) => {
+      return AUDIO_SelectDevice(label, id);
+    }, [label, id]);
+
+    if (result && result[0]) {
+      if (saveAsManual) Helpers.add("manualAudioDevice", resolvedTab.id);
+      // Different tabs can have different id for the same device
+      // So, we want to store id for the tab
+      Helpers.set("deviceId_per_tab_" + resolvedTab.id + result[1], result[2]);
+      console.info(`Audio device "${result[1]}" (${result[2]}) selected for tab "${resolvedTab.title}"`);
+    } else if (label && id) {
+      console.error(`Failed to select audio device "${label}" (${id}) for tab "${resolvedTab.title}"`);
+    }
+
+    return result;
+  },
+
+  autoSelectDevice: async function (tab) {
+    if (!tab) return false;
+    if (Helpers.has("manualAudioDevice", tab.id)) {
+      console.info(`Tab ${tab.id} has manual audio device set. Skipping auto selection.`);
+      return false;
+    }
+
+    return await Helpers.getStorageValue(DATA_PATTERNS, true).then((data) => {
+      if (data && data.length > 0) {
+        for (let i = 0; i < data.length; i++) {
+          const pattern = data[i];
+          if (!pattern.urlPattern) continue;
+          const urlPattern = new RegExp("/" + pattern.urlPattern.replaceAll("/", "/") + "/", "i");
+          // Check if the tab URL matches the pattern
+          if (tab.url.match(urlPattern)) {
+            if (pattern.audioOutput && pattern.audioOutput !== "Default") {
+              SelectAudio.selectDevice(tab, pattern.audioOutput, pattern.audioOutputId, false);
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    });
   }
 };
+
 
 class MeetTabsManager {
   constructor(key) {
@@ -252,31 +375,11 @@ class GoogleMeetTabsManager extends MeetTabsManager {
   }
 }
 
-const SelectAudio = {
-  enumarateDevices: async function (tab) {
-    return Helpers.executeInTab(tab, () => {
-      return AUDIO_EnumareteDevices();
-    });
-  },
+const MeetManagers = [ ];
 
-  selectDevice: async function (tab = null, label = "", id = "") {
-    return Helpers.executeInTab(tab, (label, id) => {
-      return AUDIO_SelectDevice(label, id);
-    }, [label, id]);
-  },
-};
-
-function openSettingsPage() {
-  let createData = {
-    active: true,
-    url: "options.html",
-  };
-  API.tabs.create(createData);
+if (Helpers.getStorageValue("enableGoogleMeetTabs", true)) {
+  MeetManagers.push(new GoogleMeetTabsManager());
 }
-
-const MeetManagers = [
-  new GoogleMeetTabsManager(),
-];
 
 async function GetTabWithInMeeting() {
   const allInMeetingTabs = MeetManagers.map(async (manager) => (await manager.getTabsWithInMeeting()).map((tab) => [manager, tab])).flat(1);
@@ -341,6 +444,8 @@ async function MeetToggleMuteCamera() {
   return false;
 }
 
+
+// Listen for commands (shortcuts)
 API.commands.onCommand.addListener((command) => {
   if (command === "meet-switch-tab") {
     MeetSwitchToNextTab();
@@ -355,46 +460,22 @@ API.commands.onCommand.addListener((command) => {
   }
 });
 
-function getAudioPatterns() {
-  return API.storage.local.get("patterns").catch((error) => {
-    console.error(`Error getting audio patterns: ${error}`);
-    return null;
-  });
-}
-
-function checkTabAudio(tab) {
-  // Load from storage settings
-  getAudioPatterns().then((data) => {
-    if (data && data.patterns && data.patterns.length > 0) {
-      for (let i = 0; i < data.patterns.length; i++) {
-        let pattern = data.patterns[i];
-        if (!pattern.urlPattern) continue;
-        const urlPattern = new RegExp(
-          "/" + pattern.urlPattern.replaceAll("/", "/") + "/",
-          "i"
-        );
-        // Check if the tab URL matches the pattern
-        if (tab.url.match(urlPattern)) {
-          if (pattern.audioOutput && pattern.audioOutput !== "Default") {
-            SelectAudio.selectDevice(tab, pattern.audioOutput, pattern.audioOutputId);
-          }
-          break;
-        }
-      }
-    }
-  });
-}
-
-// Now we want listen when new tab opened or updated/reloaded and check from storage url patterns to set audio devices
-API.tabs.onCreated.addListener((tab) => {
-  if (tab.audible) {
-    checkTabAudio(tab);
-  }
-});
+// Listen when new tab stay audiable and check from storage url patterns to set audio devices
+// Also - we want to remember if manually selected device for some tab
 API.tabs.onUpdated.addListener(
   (tabId, changeInfo, tab) => {
-    if (changeInfo?.status === "complete" || changeInfo?.audible) {
-      checkTabAudio(tab);
+    if (tab.url.indexOf("http") !== 0) {
+      return;
     }
+
+    if (changeInfo?.audible) {
+      SelectAudio.autoSelectDevice(tab);
+    }
+  }
+);
+API.tabs.onRemoved.addListener(
+  (tabId, removeInfo) => {
+    // Remove tab from manual audio device list
+    Helpers.remove("manualAudioDevice", tabId);
   }
 );
