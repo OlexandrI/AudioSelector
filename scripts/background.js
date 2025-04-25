@@ -69,9 +69,9 @@ const Helpers = {
     }
 
     // Make tab and window active
-    console.log(`Making tab ${MakeActive.title} active`);
+    console.log(`Making tab ${resolvedTab.title} active`);
     // We need to be sure that window with this tab is active
-    let result = await API.windows.update(MakeActive.windowId, {
+    let result = await API.windows.update(resolvedTab.windowId, {
       focused: true,
     }).catch((error) => {
       console.error(`Error switching to window ${resolvedTab.windowId}: ${error}`);
@@ -81,7 +81,7 @@ const Helpers = {
     });
 
     // Switch to the tab
-    result = result && await API.tabs.update(MakeActive.id, unmute ? {
+    result = result && await API.tabs.update(resolvedTab.id, unmute ? {
       muted: false,
       active: true,
     } : {
