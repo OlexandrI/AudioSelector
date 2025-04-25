@@ -43,7 +43,7 @@ class AudioDevicePattern {
         actionsCell.className = "field-actions";
         const removeButton = document.createElement("button");
         removeButton.type = "button";
-        removeButton.className = "remove-button";
+        removeButton.className = "btn remove small";
         removeButton.textContent = "Remove";
         actionsCell.appendChild(removeButton);
         row.appendChild(actionsCell);
@@ -243,6 +243,163 @@ class AudioDeviceManager {
     }
 }
 
+
+// By using storage API with keys like "enableGoogleMeetTabs" - manage what type of meetings should be supported
+// This class covers one type and manage html row in table of settings page
+class MeetSupportFeature {
+    constructor(name) {
+        this.name = name;
+        this.enabled = false;
+        this.rowElement = null;
+        this.load();
+    }
+
+    key() {
+        return "enable" + this.name + "Tabs";
+    }
+
+    load() {
+        const key = this.key();
+        const self = this;
+        API.storage.local.get(key).then((data) => {
+            if (data && data[key] !== undefined) {
+                self.enabled = data[key];
+                self.updateUI();
+            }
+        });
+    }
+
+    save() {
+        const key = this.key();
+        API.storage.local.set({ [key]: this.enabled });
+    }
+
+    updateUI() {
+        if (this.rowElement) {
+            const checkbox = this.rowElement.querySelector("input[type='checkbox']");
+            if (checkbox) {
+                checkbox.checked = this.enabled;
+            }
+        }
+    }
+
+    onChange() {
+        this.save();
+        this.updateUI();
+    }
+
+    init(tbodyElement) {
+        if (this.rowElement) {
+            this.rowElement.remove();
+        }
+        this.rowElement = MeetSupportFeature.makeHTMLRow(this.name, this.enabled);
+        if (tbodyElement) {
+            tbodyElement.appendChild(this.rowElement);
+        }
+        this.initEvents();
+    }
+
+    static makeHTMLRow(name, enabled) {
+        const row = document.createElement("tr");
+
+        const checkboxCell = document.createElement("td");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = enabled;
+        checkboxCell.appendChild(checkbox);
+        row.appendChild(checkboxCell);
+
+        const nameCell = document.createElement("td");
+        nameCell.textContent = name;
+        row.appendChild(nameCell);
+
+        return row;
+    }
+
+    initEvents() {
+        if (this.rowElement) {
+            const self = this;
+            const checkbox = this.rowElement.querySelector("input[type='checkbox']");
+            if (checkbox) {
+                checkbox.addEventListener("change", () => {
+                    self.enabled = checkbox.checked;
+                    self.onChange();
+                });
+            }
+        }
+    }
+}
+
+class MeetSupportManager {
+    constructor() {
+        this.features = [
+            new MeetSupportFeature("GoogleMeet")
+        ];
+    }
+
+    static getInstance() {
+        if (!MeetSupportManager.instance) {
+            MeetSupportManager.instance = new MeetSupportManager();
+        }
+        return MeetSupportManager.instance;
+    }
+
+    init(tableElement) {
+        const tbodyElement = tableElement.querySelector("tbody");
+        if (tbodyElement) {
+            while (tbodyElement.firstChild) {
+                tbodyElement.removeChild(tbodyElement.lastChild);
+            }
+            this.features.forEach((feature) => feature.init(tbodyElement));
+            this.loadSettings();
+        }
+    }
+
+    loadSettings() {
+        this.features.forEach((feature) => feature.load());
+    }
+
+    saveAll() {
+        this.features.forEach((feature) => feature.save());
+    }
+}
+
+async function ShowAllShortcuts() {
+    // shorcuts - array of Command objects: {name, description, shortcut}
+    const shortcuts = await API.commands.getAll();
+    const shortcutsTable = document.querySelector("#keyboard-shortcut-table");
+    if (shortcutsTable) {
+        while (shortcutsTable.firstChild) {
+            shortcutsTable.removeChild(shortcutsTable.lastChild);
+        }
+        shortcuts.forEach((shortcut) => {
+            const row = document.createElement("tr");
+            const shortcutCell = document.createElement("td");
+            shortcutCell.className = "shortcut-name";
+            shortcutCell.textContent = shortcut.shortcut || "None";
+            row.appendChild(shortcutCell);
+            const descriptionCell = document.createElement("td");
+            descriptionCell.className = "shortcut-description";
+            descriptionCell.textContent = shortcut.description;
+            row.appendChild(descriptionCell);
+            shortcutsTable.appendChild(row);
+        });
+    }
+}
+
+async function ResetAllShortcuts() {
+    const shortcuts = await API.commands.getAll();
+    const resetPromises = shortcuts.map((shortcut) => {
+        return API.commands.reset(shortcut.name);
+    });
+    await Promise.all(resetPromises);
+    ShowAllShortcuts();
+};
+
+async function OpenShorcutsPage() {
+    API.commands.openShortcutSettings();
+};
+
 /**
  * Update the UI: set the value of the shortcut textbox.
  */
@@ -266,6 +423,20 @@ async function updateUI() {
         if (warnElem) {
             warnElem.style.display = "block";
         }
+    }
+
+    const meetSupportTable = document.querySelector("#meet-support-table");
+    if (meetSupportTable) {
+        const meetSupportManager = MeetSupportManager.getInstance();
+        meetSupportManager.init(meetSupportTable);
+    }
+
+    ShowAllShortcuts();
+    if (document.querySelector("#keyboard-shortcut-reset")) {
+        document.querySelector("#keyboard-shortcut-reset").addEventListener("click", ResetAllShortcuts);
+    }
+    if (document.querySelector("#keyboard-shortcut-settings")) {
+        document.querySelector("#keyboard-shortcut-settings").addEventListener("click", OpenShorcutsPage);
     }
 }
 

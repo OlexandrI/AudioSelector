@@ -24,9 +24,53 @@
         color: red;
         cursor: pointer;
       }
+      .btn {
+        padding: 10px 20px;
+        margin: 5px 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .btn.small {
+        padding: 5px 10px;
+        margin: 2px 4px;
+        font-size: 0.8em;
+      }
     </style>
   </head>
   <body>
+    <h2>Keyboard shortcuts</h2>
+    <p>Keyboard shortcuts are available for the following actions:</p>
+    <table id="keyboard-shortcut-table">
+      <thead>
+        <tr>
+          <th class="field-key">Key</th>
+          <th class="field-action">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+    <button id="keyboard-shortcut-reset" class="btn reset">Reset to Default</button>
+    <button id="keyboard-shortcut-settings" class="btn openpage">Open in shortcuts settings</button>
+
+    <hr />
+
+    <h2>Tabs with Meet supports</h2>
+    <p>Meet supports the following types of tabs:</p>
+    <table id="meet-support-table">
+      <thead>
+        <tr>
+          <th class="field-enabled">Enabled</th>
+          <th class="field-type">Meet type</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+    
+    <hr />
+
     <h2>Device Selection by URL Pattern</h2>
     <p id="audio-select-warn-firefox" class="warning" style="display:none;">Please set 'media.setsinkid.enabled' to 'true' in 'about:config'!</p>
     <p class="warning">This is an experimental feature that may not work stably.
@@ -44,7 +88,7 @@
       <tbody>
       </tbody>
     </table>
-    <button id="add-pattern">Add New Pattern</button>
+    <button id="add-pattern" class="btn add">Add New Pattern</button>
 
     <script src="scripts/audio.js"></script>
     <script src="options.js"></script>
