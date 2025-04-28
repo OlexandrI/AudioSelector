@@ -202,7 +202,7 @@ const SelectAudio = {
       if (data && data.length > 0) {
         for (let i = 0; i < data.length; i++) {
           const pattern = data[i];
-          if (!pattern.urlPattern) continue;
+          if (!pattern.urlPattern || !pattern.audioOutput || pattern.audioOutput === "Default") continue;
           const urlPattern = new RegExp("/" + pattern.urlPattern.replaceAll("/", "/") + "/", "i");
           // Check if the tab URL matches the pattern
           if (tab.url.match(urlPattern)) {

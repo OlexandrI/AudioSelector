@@ -2,11 +2,73 @@ const API = typeof browser !== "undefined" ? browser : chrome; // For compatibil
 const IS_CHROME = typeof chrome !== "undefined" && typeof browser === "undefined";
 const DATA_PATTERNS = "patterns";
 
+function resolveElement(selector) {
+    if (selector instanceof HTMLElement) {
+        return selector;
+    } else if (typeof selector === "string") {
+        const element = document.querySelectorAll(selector);
+        if (element) {
+            return element;
+        } 
+    }
+    console.error(`Element not found for selector: ${selector}`);
+    return null;
+}
+
+function elementDo(selector, cb) {
+    const element = resolveElement(selector);
+    if (element instanceof HTMLElement) {
+        return [cb(element)];
+    }
+    if (element instanceof NodeList) {
+        if (element.length === 0) {
+            return null;
+        }
+        let results = [];
+        element.forEach((elem) => {
+            results.push(cb(elem));
+        });
+        return results;
+    }
+    return null;
+}
+
+function setVisibility(selector, visible) {
+    return elementDo(selector, (element) => {
+        element.style.display = visible ? "block" : "none";
+    });
+}
+
+function isVisible(selector) {
+    const results = elementDo(selector, (element) => {
+        return element.style.display !== "none";
+    });
+    if (results && results.length > 0) return results.every((result) => result === true);
+    return false;
+}
+
+function btnBind(selector, callback) {
+    return elementDo(selector, (element) => {
+        if (isVisible(element)) {
+            element.addEventListener("click", (event) => {
+                if (callback(event)) {
+                    event.preventDefault();
+                }
+            });
+        }
+    });
+}
+
+
 let PatternsManager = null;
 
 class AudioDevicePattern {
     static useSelectList() {
         return navigator.mediaDevices?.selectAudioOutput ? false : true;
+    }
+
+    static showDefaultOption() {
+        return !IS_CHROME;
     }
 
     static makeHTMLRow(pattern = {}, devices = {}) {
@@ -34,7 +96,7 @@ class AudioDevicePattern {
             outputField.type = "text";
             outputField.className = "audio-output";
             outputField.readOnly = true;
-            outputField.value = pattern.audioOutput || "Default";
+            outputField.value = pattern.audioOutput || (AudioDevicePattern.showDefaultOption() ? "Default" : "");
             outputCell.appendChild(outputField);
         }
         row.appendChild(outputCell);
@@ -74,7 +136,7 @@ class AudioDevicePattern {
     getPatternData() {
         return {
             urlPattern: this.pattern.urlPattern,
-            audioOutput: this.pattern.audioOutput || "Default",
+            audioOutput: this.pattern.audioOutput || (AudioDevicePattern.showDefaultOption() ? "Default" : ""),
             audioOutputId: this.pattern.audioOutputId || null,
         };
     }
@@ -83,7 +145,7 @@ class AudioDevicePattern {
         return {
             urlInput: this.rowElement ? this.rowElement.querySelector(".url-pattern") : null,
             audioOutputSelect: this.rowElement ? this.rowElement.querySelector(".audio-output") : null,
-            removeButton: this.rowElement ? this.rowElement.querySelector(".remove-button") : null,
+            removeButton: this.rowElement ? this.rowElement.querySelector(".remove.btn") : null,
         };
     }
 
@@ -118,7 +180,7 @@ class AudioDevicePattern {
         const self = this;
         navigator.mediaDevices.selectAudioOutput().then((device) => {
             if (device) {
-                self.pattern.audioOutput = device.label || "Default";
+                self.pattern.audioOutput = device.label || (AudioDevicePattern.showDefaultOption() ? "Default" : "");
                 self.pattern.audioOutputId = device.deviceId;
                 self.onChange();
             }
@@ -156,10 +218,12 @@ class AudioDevicePattern {
                 while (audioOutputSelect.firstChild) {
                     audioOutputSelect.removeChild(audioOutputSelect.lastChild);
                 }
-                const defaultOption = document.createElement("option");
-                defaultOption.value = "Default";
-                defaultOption.textContent = "Default";
-                audioOutputSelect.appendChild(defaultOption);
+                if (AudioDevicePattern.showDefaultOption()) {
+                    const defaultOption = document.createElement("option");
+                    defaultOption.value = "Default";
+                    defaultOption.textContent = "Default";
+                    audioOutputSelect.appendChild(defaultOption);
+                }
                 devices.audiooutput.forEach((device) => {
                     const option = document.createElement("option");
                     option.value = device.deviceId;
@@ -179,7 +243,7 @@ class AudioDevicePattern {
             }
             if (audioOutputSelect) {
                 if (audioOutputSelect.tagName === "INPUT") {
-                    audioOutputSelect.value = this.pattern.audioOutput || "Default";
+                    audioOutputSelect.value = this.pattern.audioOutput || (AudioDevicePattern.showDefaultOption() ? "Default" : "");
                 } else if (audioOutputSelect.tagName === "SELECT") {
                     const options = Array.from(audioOutputSelect.options);
                     let selectedOption = options.find((option) => option.value === this.pattern.audioOutputId);
@@ -189,7 +253,7 @@ class AudioDevicePattern {
                     if (selectedOption) {
                         audioOutputSelect.value = selectedOption.value;
                     } else {
-                        audioOutputSelect.value = "Default";
+                        audioOutputSelect.value = (AudioDevicePattern.showDefaultOption() ? "Default" : "");
                     }
                 }
             }
@@ -400,10 +464,13 @@ async function OpenShorcutsPage() {
     API.commands.openShortcutSettings();
 };
 
+
 /**
  * Update the UI: set the value of the shortcut textbox.
  */
 async function updateUI() {
+    elementDo(".hide-on-chrome", (elem) => { if (IS_CHROME) setVisibility(elem, false) });
+    elementDo(".hide-on-firefox", (elem) => { if (!IS_CHROME) setVisibility(elem, false) });
 
     PatternsManager = new AudioDeviceManager();
     const tableElement = document.querySelector("#device-pattern-table");
@@ -411,18 +478,12 @@ async function updateUI() {
         await PatternsManager.init(tableElement);
     }
 
-    const addButton = document.querySelector("#add-pattern");
-    if (addButton) {
-        addButton.addEventListener("click", () => {
-            PatternsManager.addNewPattern();
-        });
-    }
+    btnBind("#add-pattern", () => {
+        PatternsManager.addNewPattern();
+    });
 
     if (!IS_CHROME && !navigator.mediaDevices.selectAudioOutput) {
-        let warnElem = document.querySelector("#audio-select-warn-firefox");
-        if (warnElem) {
-            warnElem.style.display = "block";
-        }
+        setVisibility("#audio-select-warn-firefox", true);
     }
 
     const meetSupportTable = document.querySelector("#meet-support-table");
@@ -432,12 +493,8 @@ async function updateUI() {
     }
 
     ShowAllShortcuts();
-    if (document.querySelector("#keyboard-shortcut-reset")) {
-        document.querySelector("#keyboard-shortcut-reset").addEventListener("click", ResetAllShortcuts);
-    }
-    if (document.querySelector("#keyboard-shortcut-settings")) {
-        document.querySelector("#keyboard-shortcut-settings").addEventListener("click", OpenShorcutsPage);
-    }
+    btnBind("#keyboard-shortcut-reset", ResetAllShortcuts);
+    btnBind("#keyboard-shortcut-settings", OpenShorcutsPage);
 }
 
 /**

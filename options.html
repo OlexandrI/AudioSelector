@@ -5,9 +5,28 @@
     <meta name="color-scheme" content="dark light">
     <title>Extension Options</title>
     <style>
+      body {
+        min-width: 768px;
+        max-width: 960px;
+        width: 75%;
+        margin: auto;
+        padding: 10px 0px;
+        font-size: 14px;
+      }
+      hr {
+        margin: 20px auto;
+        width: 96%;
+        border-color: grey;
+        border-style: dashed;
+      }
+      p {
+        font-size: 0.9em;
+        text-align: justify;
+      }
       table {
         border-collapse: collapse;
         width: 100%;
+        table-layout: fixed;
       }
       th, td {
         border: 0px solid #ddd;
@@ -25,8 +44,8 @@
         cursor: pointer;
       }
       .btn {
-        padding: 10px 20px;
-        margin: 5px 10px;
+        padding: 8px 16px;
+        margin: 2px 4px;
         border: none;
         border-radius: 5px;
         cursor: pointer;
@@ -36,6 +55,44 @@
         margin: 2px 4px;
         font-size: 0.8em;
       }
+      select, input[type="text"] {
+        width: 100%;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+      }
+      select {
+        padding: 2px 5px;
+      }
+      input[type="text"] {
+        line-height: 1.5;
+      }
+      .warning {
+        color: #ffffb2;
+        font-style: italic;
+        padding-left: 3.2em;
+      }
+      .warning::before {
+        content: "⚠️ ";
+        font-size: 2em;
+        font-style: normal;
+        margin-left: -1.6em;
+        display: block;
+        height: 0px;
+      }
+
+      .field-enabled {
+        width: 10%;
+      }
+      .shortcut-name {
+        width: 20%;
+      }
+      .field-url {
+        width: 33.33%;
+      }
+      .field-actions {
+        width: 16.66%;
+      }
+
     </style>
   </head>
   <body>
@@ -51,8 +108,8 @@
       <tbody>
       </tbody>
     </table>
-    <button id="keyboard-shortcut-reset" class="btn reset">Reset to Default</button>
-    <button id="keyboard-shortcut-settings" class="btn openpage">Open in shortcuts settings</button>
+    <button id="keyboard-shortcut-reset" class="btn reset hide-on-chrome">Reset to Default</button>
+    <button id="keyboard-shortcut-settings" class="btn openpage hide-on-chrome">Open in shortcuts settings</button>
 
     <hr />
 
@@ -72,11 +129,14 @@
     <hr />
 
     <h2>Device Selection by URL Pattern</h2>
-    <p id="audio-select-warn-firefox" class="warning" style="display:none;">Please set 'media.setsinkid.enabled' to 'true' in 'about:config'!</p>
-    <p class="warning">This is an experimental feature that may not work stably.
+    <p id="audio-select-warn-firefox" class="warning hide-on-chrome" style="display:none;">Please set 'media.setsinkid.enabled' to 'true' in 'about:config'!</p>
+    <p class="warning">
+      This is an experimental feature that may not work stably.
       Also, due to security restrictions, there is no direct access to devices and no ability to always directly set the selected device.
       Therefore, the user should be prompted once to select a device for a tab.
-      Additionally, this feature may not work correctly with devices that are dynamically connected.</p>
+      Additionally, this feature may not work correctly with devices that are dynamically connected.
+      To obtain device selection rights, access to the microphone will be requested. Unfortunately, this is currently the only way to obtain these rights, the microphone itself will not be used by the application in any way.
+    </p>
     <table id="device-pattern-table">
       <thead>
         <tr>
