@@ -5,6 +5,9 @@
 // - Popup messages from chat (TODO)
 // This script will communicate with the background script to send messages and perform actions
 
+if (!window._AUDIOSELECTOR_GMEETSUPPORT) {
+window._AUDIOSELECTOR_GMEETSUPPORT = true; // Flag to indicate that this script is running
+
 const JOIN_BTN_SELECTOR = '[jsname="Qx7uuf"]';
 const MUTE_BTNS_SELECTOR = '[data-is-muted] > div';
 const MIC_BTN_SELECTOR = '[data-is-muted][jsname="hw0c9"] > div';
@@ -46,7 +49,6 @@ function GMeet_getMutedBtns() {
             result.micBtn = result.micBtn || Btns[0];
             result.camBtn = result.camBtn || Btns[2];
         } else {
-            console.warn('[AudioSelector] Mute buttons not found!');
             return null;
         }
     }
@@ -59,8 +61,8 @@ function GMeet_getMutedBtns() {
 function GMeet_getMutedState(btns) {
     btns = btns || GMeet_getMutedBtns();
     // Check if the mic and camera buttons are muted or not
-    const micMuted = btns.micBtn ? btns.micBtn.parentElement.dataset.isMuted === 'true' : false;
-    const camMuted = btns.camBtn ? btns.camBtn.parentElement.dataset.isMuted === 'true' : false;
+    const micMuted = (btns && btns.hasOwnProperty("micBtn") && btns.micBtn) ? btns.micBtn.parentElement.dataset.isMuted === 'true' : false;
+    const camMuted = (btns && btns.hasOwnProperty("camBtn") && btns.camBtn) ? btns.camBtn.parentElement.dataset.isMuted === 'true' : false;
     return { micMuted, camMuted };
 }
 
@@ -102,3 +104,5 @@ function GMeet_switchCam() {
     }
     return false;
 }
+
+};

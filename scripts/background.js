@@ -61,6 +61,25 @@ const Helpers = {
     return results[0].result;
   },
 
+  injectScript: async function (tab, script) {
+    const resolvedTab = await Helpers.resolveTab(tab);
+    if (!resolvedTab) {
+      console.error("No valid tab found to inject script.");
+      return false;
+    }
+
+    try {
+      const result = await API.scripting.executeScript({
+        target: { tabId: resolvedTab.id },
+        files: [script],
+      });
+      return true;
+    } catch (error) {
+      console.error(`Error injecting script ${script} in tab ${resolvedTab.id}: ${error}`);
+      return false;
+    }
+  },
+
   focusTab: async function (tab, unmute = false) {
     const resolvedTab = await Helpers.resolveTab(tab);
     if (!resolvedTab) {
@@ -203,7 +222,7 @@ const SelectAudio = {
         for (let i = 0; i < data.length; i++) {
           const pattern = data[i];
           if (!pattern.urlPattern || !pattern.audioOutput || pattern.audioOutput === "Default") continue;
-          const urlPattern = new RegExp("/" + pattern.urlPattern.replaceAll("/", "/") + "/", "i");
+          const urlPattern = new RegExp("/" + pattern.urlPattern.replaceAll("/", "\\/") + "/", "i");
           // Check if the tab URL matches the pattern
           if (tab.url.match(urlPattern)) {
             if (pattern.audioOutput && pattern.audioOutput !== "Default") {
@@ -223,22 +242,31 @@ class MeetTabsManager {
   constructor(key) {
     this.key = key;
     this.urlPattern = "*://domain.com/*";
+    this.urlRegExp = null;
   }
 
   // Check tab is this type of meet tab
   // @param {object} tab - Tab object to check
   // @return {boolean} - True if tab is a meet tab, false otherwise
   isTab(tab) {
-    return tab && tab.url && (new RegExp(this.urlPattern, 'i')).test(tab.url);
+    if (!this.urlRegExp) {
+      this.urlRegExp = new RegExp("/" + this.urlPattern.replaceAll("/", "\\/") + "/", "i");
+    }
+    return tab && tab.url && this.urlRegExp.test(tab.url);
   }
 
   // Request to get all meet tabs
   // @return {Promise} - Promise with array of meet tabs
   async queryTabs() {
-    return API.tabs.query({ url: this.urlPattern }).catch((error) => {
+    try {
+      return await API.tabs.query({ url: this.urlPattern });
+    } catch (error) {
       console.error(`Error querying tabs: ${error}`);
       return [];
-    });
+    }
+  }
+
+  async inject(tab) {
   }
 
   // Get tab info from the meet tab
@@ -350,6 +378,10 @@ class GoogleMeetTabsManager extends MeetTabsManager {
     this.urlPattern = "*://meet.google.com/*";
   }
 
+  async inject(tab) {
+    return await Helpers.injectScript(tab, "scripts/gmeet.js");
+  }
+
   async getState(tab) {
     return await Helpers.executeInTab(tab, () => {
       return GMeet_getState();
@@ -382,8 +414,26 @@ if (Helpers.getStorageValue("enableGoogleMeetTabs", true)) {
 }
 
 async function GetTabWithInMeeting() {
-  const allInMeetingTabs = MeetManagers.map(async (manager) => (await manager.getTabsWithInMeeting()).map((tab) => [manager, tab])).flat(1);
-  return allInMeetingTabs.length === 1 ? [manager, allInMeetingTabs[0]] : null;
+  const allInMeetingTabs = [];
+  for (const manager of MeetManagers) {
+    const tabs = await manager.getTabsWithInMeeting();
+    if (tabs.length > 0) {
+      allInMeetingTabs.push(...tabs.map((tab) => [manager, tab]));
+    }
+  }
+  if (allInMeetingTabs.length === 1) {
+    return allInMeetingTabs[0];
+  } else if (allInMeetingTabs.length > 1) {
+    // If we have more than one tab in meeting - check if we have focused one of them
+    const focusedTab = await Helpers.activeTab();
+    const focusedTabIndx = focusedTab ? allInMeetingTabs.findIndex((tab) => tab[1].id === focusedTab.id) : -1;
+    if (focusedTabIndx !== -1) {
+      // If we have focused one of them - return it
+      return allInMeetingTabs[focusedTabIndx];
+    }
+  }
+
+  return null;
 }
 
 async function MeetSwitchToNextTab() {
@@ -444,6 +494,16 @@ async function MeetToggleMuteCamera() {
   return false;
 }
 
+async function injectMeetContentScript(tab) {
+  for (const manager of MeetManagers) {
+    if (manager.isTab(tab)) {
+      await manager.inject(tab);
+      return true;
+    }
+  }
+  return false;
+}
+
 
 // Listen for commands (shortcuts)
 API.commands.onCommand.addListener((command) => {
@@ -466,6 +526,10 @@ API.tabs.onUpdated.addListener(
   (tabId, changeInfo, tab) => {
     if (tab.url.indexOf("http") !== 0) {
       return;
+    }
+
+    if (changeInfo?.status === "complete") {
+      injectMeetContentScript(tab);
     }
 
     if (changeInfo?.audible) {
