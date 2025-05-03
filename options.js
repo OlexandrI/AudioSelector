@@ -1142,6 +1142,15 @@ async function updateUI() {
     btnBind("#add-pattern", () => {
         AudioDevicePatternManager.getInstance().addNewPattern();
     });
+    btnBind("#permisions-patterns", () => {
+        AudioDevicePatternManager.getInstance().requestPermission();
+    });
+    watchChange("PatternsManager.request", () => AudioDevicePatternManager.getInstance().hasPermission(), (hasPermission) => {
+        elementsDo("#permisions-patterns", (elem) => {
+            elem.disabled = hasPermission;
+        });
+        return true; // Keep watching
+    });
     const tableElement = document.querySelector("#device-pattern-table");
     if (tableElement) {
         await AudioDevicePatternManager.getInstance().init(tableElement, true);
