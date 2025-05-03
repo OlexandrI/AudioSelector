@@ -427,6 +427,7 @@ class TableRow {
                         self.onChanged(select, event, header.key, selectedValue);
                     });
                     cell.appendChild(select);
+                    valueElem = select;
                     break;
                 case "checkbox":
                     const checkbox = document.createElement("input");
@@ -437,6 +438,7 @@ class TableRow {
                         self.onChanged(checkbox, event, header.key, checkedValue);
                     });
                     cell.appendChild(checkbox);
+                    valueElem = checkbox;
                     break;
                 case "input":
                 case "input-readonly":
@@ -455,6 +457,7 @@ class TableRow {
                         self.onChanged(input, event, header.key, inputValue);
                     });
                     cell.appendChild(input);
+                    valueElem = input;
                     break;
             };
             if (valueElem) {
@@ -825,6 +828,20 @@ const AudioDevicePatternSchema = new TableDataSchema({
                 return { value: device.deviceId, label: device.label || device.deviceId };
             });
         },
+        getter: function (data) {
+            return AudioDevicePatternStatic.useSelectList() ? data.audioOutputId : data.audioOutput || (AudioDevicePatternStatic.showDefaultOption() ? "Default" : "");
+        },
+        setter: function (data, value) {
+            const device = AudioDevicePatternManager.getInstance().devices.audiooutput.find((device) => {
+                return device.deviceId === value || device.label === value;
+            });
+            if (device) {
+                data.audioOutputId = device.deviceId;
+                data.audioOutput = device.label || (AudioDevicePatternStatic.showDefaultOption() ? "Default" : "");
+            } else {
+                data.audioOutputId = value;
+            }
+        },
     }
 });
 
@@ -836,14 +853,15 @@ class AudioDevicePatternRow extends TableRow {
             origins: [this.get("urlPattern")]
         };
         this.autoSave = true;
+        this._requested = false;
     }
 
     onChanged(elem, event, key, value) {
         if (key === "urlPattern") {
             this.permission.origins = [value];
             this.checkPermission();
-        } else if (key === "audioOutput") {
-            const selectedDevice = this.devices.audiooutput.find((device) => device.deviceId === value);
+        } else if (key === "audioOutputId") {
+            const selectedDevice = this.devices.audiooutput.find((device) => device.deviceId === value || device.label === value);
             if (selectedDevice) {
                 this.data.audioOutputId = selectedDevice.deviceId;
                 this.data.audioOutput = selectedDevice.label || (AudioDevicePatternStatic.showDefaultOption() ? "Default" : "");
@@ -854,6 +872,27 @@ class AudioDevicePatternRow extends TableRow {
         }
 
         super.onChanged(elem, event, key, value);
+    }
+
+    onFocused(elem, event, key) {
+        if (this._requested) return;
+        this._requested = true;
+        const self = this;
+        if (key === "audioOutputId" && !AudioDevicePatternStatic.useSelectList()) {
+            navigator.mediaDevices.selectAudioOutput().then((device) => {
+                if (device) {
+                    AUDIO_EnumareteDevices().then((devices) => {
+                        if (devices.audiooutput.length > 0) AudioDevicePatternManager.getInstance().devices = devices;
+                        self.onChanged(elem, event, key, device.deviceId);
+                        self._requested = false;
+                    });
+                }
+            }).catch((error) => {
+                console.warn("Error selecting audio output device:", error);
+                self._requested = false;
+            });
+        }
+        super.onFocused(elem, event, key);
     }
 }
 
