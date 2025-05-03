@@ -235,7 +235,6 @@ class TableDataSchema {
 class TableRow {
     constructor(data, schema) {
         this.rowElement = null;
-        this.remove = false;
         this.data = data;
         this.schema = schema;
         this.autoSave = false;
@@ -247,6 +246,7 @@ class TableRow {
         this._isDirty = false;
         this._scope_updateState = false;
         this._scope_load = false;
+        this._remove = false;
     }
 
     getData() {
@@ -348,8 +348,8 @@ class TableRow {
 
     remove() {
         this.removeHTML();
-        this.remove = true;
-        updateState();
+        this._remove = true;
+        this.updateState();
     }
 
     onChanged(elem, event, key, value) {
@@ -395,9 +395,8 @@ class TableRow {
         removeButton.className = "btn remove small";
         removeButton.textContent = "🗑️";
         removeButton.addEventListener("click", (event) => {
-            self.removeHTML();
-            self.remove = true;
-            updateState();
+            self.remove();
+            event.preventDefault();
         });
         actionsCell.appendChild(removeButton);
     }
@@ -664,7 +663,7 @@ class TableHelper {
     }
 
     getData() {
-        return this.rows.map((row) => row.getData());
+        return this.rows.filter(row => !row._remove).map((row) => row.getData());
     }
 
     removeAll() {
