@@ -51,6 +51,9 @@
   "host_permissions": [
     "*://meet.google.com/*"
   ],
+  "optional_host_permissions": [
+    "*://*/*"
+  ],
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
