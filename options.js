@@ -1,7 +1,6 @@
 const API = typeof browser !== "undefined" ? browser : chrome; // For compatibility with Chrome and Firefox
 const IS_CHROME = typeof chrome !== "undefined" && typeof browser === "undefined";
 const DATA_PATTERNS = "patterns";
-const DEBUG_TRACE = true; // Set to true to enable debug trace
 
 function resolveElement(selector) {
     if (typeof selector === "undefined") {
@@ -126,15 +125,6 @@ function watchChange(key, checkFn, cb, fireIfFirstOnChanged = true, interval = 1
     if (fireIfFirstOnChanged && prevValue !== watchChange[key]) {
         cb(watchChange[key], prevValue);
     }
-}
-
-function _DEBUG_CALL() {
-    if (!DEBUG_TRACE) return;
-    const stack = new Error().stack;
-    const callerFull = stack.split('\n')[1].trim();
-    const indx = ([callerFull.indexOf('@'), callerFull.indexOf('/'), callerFull.indexOf('<')]).reduce((a, b) => b == -1 ? a : Math.min(a, b));
-    const caller = indx >= 0 ? callerFull.substring(0, indx).trim() : callerFull;
-    console.log(`Called ${caller} with arguments:`, arguments);
 }
 
 // Schema represented as json object.
@@ -266,15 +256,12 @@ class TableRow {
     }
 
     checkPermission() {
-        _DEBUG_CALL(this.permission);
         if (this.permission) {
             const self = this;
             return API.permissions.contains(this.permission).then((result) => {
-                _DEBUG_CALL(self.permission, result);
                 self._hasPermission = result;
                 self.updateState();
             }).catch((error) => {
-                _DEBUG_CALL(self.permission, error);
                 self._hasPermission = false;
                 self.updateState();
             });
@@ -284,7 +271,6 @@ class TableRow {
     }
 
     requestPermission() {
-        _DEBUG_CALL();
         if (this.permission) {
             const self = this;
             return API.permissions.request(this.permission).then((result) => {
@@ -301,7 +287,6 @@ class TableRow {
     }
 
     afterAnyChange() {
-        _DEBUG_CALL();
         this._isDirty = true;
         if (this.autoSave) {
             this.save();
@@ -315,7 +300,6 @@ class TableRow {
     }
 
     set(key, value, triggerEvents = true) {
-        _DEBUG_CALL(arguments);
         if (this.schema.setFieldValue(key, this.data, value)) {
             if (triggerEvents && !this._scope_load) this.afterAnyChange();
             return true;
@@ -353,7 +337,6 @@ class TableRow {
     }
 
     onChanged(elem, event, key, value) {
-        _DEBUG_CALL(arguments);
         // Mark element as dirty
         elem.classList.add("dirty");
         // Update value in data object
@@ -361,12 +344,10 @@ class TableRow {
     }
 
     onFocused(elem, event, key) {
-        _DEBUG_CALL(arguments);
         elem.classList.add("focused");
     }
 
     onBlured(elem, event, key) {
-        _DEBUG_CALL(arguments);
         elem.classList.remove("focused");
     }
 
@@ -598,7 +579,6 @@ class TableRow {
 
     // Return promise
     save() {
-        _DEBUG_CALL();
         if (this._isSaving) return Promise.resolve(false);
         this._isSaving = true;
         const self = this;
@@ -622,7 +602,6 @@ class TableRow {
 
     // Return promise
     load() {
-        _DEBUG_CALL();
         if (this._isSaving) return Promise.resolve(false);
         const self = this;
         this._scope_load = true;
@@ -639,7 +618,6 @@ class TableRow {
     }
 
     init(tbodyElement) {
-        _DEBUG_CALL(arguments);
         this.removeHTML();
         this.rowElement = this.genHTML();
         if (tbodyElement) {
@@ -667,7 +645,6 @@ class TableHelper {
     }
 
     removeAll() {
-        _DEBUG_CALL();
         this.rows.forEach((row) => {
             row.remove();
         });
@@ -675,7 +652,6 @@ class TableHelper {
     }
 
     resetAll() {
-        _DEBUG_CALL();
         this.rows.forEach((row) => {
             row.reset();
         });
@@ -686,7 +662,6 @@ class TableHelper {
     }
 
     setData(data, bInit = false) {
-        _DEBUG_CALL(data, bInit);
         if (data && Array.isArray(data)) {
             this.removeAll();
             const self = this;
@@ -711,7 +686,6 @@ class TableHelper {
     }
 
     checkPermission() {
-        _DEBUG_CALL();
         const permissionPromises = this.rows.map((row) => row.checkPermission());
         return Promise.all(permissionPromises).then(() => {
             this.updateState();
@@ -722,7 +696,6 @@ class TableHelper {
     }
 
     requestPermission() {
-        _DEBUG_CALL();
         const permissionPromises = this.rows.map((row) => {
             if (row.hasPermission()) {
                 return Promise.resolve(true);
@@ -739,7 +712,6 @@ class TableHelper {
     }
 
     updateState() {
-        _DEBUG_CALL();
         if (this.tableElement) {
             const isSaving = this.isSaving();
             const isDirty = this.isDirty();
@@ -757,7 +729,6 @@ class TableHelper {
     }
 
     loadAll() {
-        _DEBUG_CALL();
         const loadPromises = this.rows.map((row) => row.load());
         return Promise.all(loadPromises).then(() => {
             this.updateState();
@@ -768,7 +739,6 @@ class TableHelper {
     }
 
     saveAll() {
-        _DEBUG_CALL();
         const savePromises = this.rows.map((row) => row.save());
         return Promise.all(savePromises).then(() => {
             self.rows = self.rows.filter((row) => !row._remove);
@@ -809,7 +779,6 @@ class TableHelper {
     }
 
     init(tableElement = null, regenHeaders = true) {
-        _DEBUG_CALL(tableElement, regenHeaders);
         const self = this;
         if (tableElement) {
             this.tableElement = resolveElement(tableElement);
@@ -917,28 +886,23 @@ class AudioDevicePatternManager extends TableHelper {
 
     loadAll() {
         const self = this;
-        _DEBUG_CALL("AudioDevicePatternManager loadAll");
         return new Promise((resolve) => {
             const cb = () => {
                 API.storage.local.get(DATA_PATTERNS).then((data) => {
-                    _DEBUG_CALL("AudioDevicePatternManager loadAll", data);
                     data = data.patterns || [];
                     self.setData(data, false);
                     self.updateState();
                     resolve();
                 }).catch((error) => {
-                    _DEBUG_CALL("AudioDevicePatternManager loadAll", error);
                     console.warn("Error loading data:", error);
                     self.updateState();
                     resolve();
                 });
             };
             AUDIO_EnumareteDevices().then((devices) => {
-                _DEBUG_CALL("AudioDevicePatternManager devices", devices);
                 self.devices = devices;
                 cb();
             }).catch((error) => {
-                _DEBUG_CALL("AudioDevicePatternManager devices", error);
                 console.error("Error loading devices:", error);
                 self.devices = {audiooutput: []};
                 cb();
@@ -948,12 +912,10 @@ class AudioDevicePatternManager extends TableHelper {
 
     saveAll() {
         const self = this;
-        _DEBUG_CALL("AudioDevicePatternManager saveAll");
         return this.requestPermission().then(async (result) => {
             const setData = {};
             setData[DATA_PATTERNS] = self.getData();
             await API.storage.local.set(setData).then(() => {
-                _DEBUG_CALL("AudioDevicePatternManager saveAll", setData);
                 self._isDirty = false;
                 self.rows = self.rows.filter((row) => !row._remove);
                 self.rows.forEach((row) => {
@@ -961,14 +923,11 @@ class AudioDevicePatternManager extends TableHelper {
                     row.updateState();
                 });
             }).catch((error) => {
-                _DEBUG_CALL("AudioDevicePatternManager saveAll", error);
                 console.error("Error saving data:", error);
             });
-            if (typeof result !== "undefined" && !result) _DEBUG_CALL("AudioDevicePatternManager saveAll no all permissions");
             this.updateState();
             return !self._isDirty;
         }).catch((error) => {
-            _DEBUG_CALL("AudioDevicePatternManager saveAll", error);
             console.error("Error requesting permission:", error);
             this.updateState();
             return false;
@@ -1013,7 +972,6 @@ class MeetSupportRow extends TableRow {
     save_implementation() {
         const key = this.key();
         const self = this;
-        _DEBUG_CALL("MeetSupportRow save_implementation", key, self.data.enabled);
         const cb = () => {
             return API.storage.local.set({ [key]: self.data.enabled });
         };
@@ -1033,16 +991,13 @@ class MeetSupportRow extends TableRow {
     load_implementation() {
         const key = this.key();
         const self = this;
-        _DEBUG_CALL("MeetSupportRow load_implementation", key);
         return API.storage.local.get(key).then((data) => {
-            _DEBUG_CALL("MeetSupportRow load_implementation", key, data);
             if (data && data[key] !== undefined) {
                 self.data.enabled = data[key];
                 self.updateState();
                 return true;
             }
         }).catch((error) => {
-            _DEBUG_CALL("MeetSupportRow load_implementation", key, error);
             console.error("Error loading data:", error);
             self.updateState();
             return false;
@@ -1111,8 +1066,6 @@ async function OpenShorcutsPage() {
  * Update the UI: set the value of the shortcut textbox.
  */
 async function updateUI() {
-    _DEBUG_CALL();
-
     elementsDo(".hide-on-chrome" , (elem) => { if ( IS_CHROME) setVisibility(elem, false) });
     elementsDo(".hide-on-firefox", (elem) => { if (!IS_CHROME) setVisibility(elem, false) });
 
@@ -1122,7 +1075,6 @@ async function updateUI() {
         event.preventDefault();
     }))) {
         AudioDevicePatternManager.getInstance().autoSave = false;
-        _DEBUG_CALL("AudioDevicePatternManager with Save button");
         watchChange("PatternsManager.disableSave", () => AudioDevicePatternManager.getInstance().isSaving() || !AudioDevicePatternManager.getInstance().isDirty(), (disableSave) => {
             elementsDo("#save-patterns", (elem) => {
                 elem.disabled = disableSave;
@@ -1137,7 +1089,6 @@ async function updateUI() {
         });
     } else {
         AudioDevicePatternManager.getInstance().autoSave = true;
-        _DEBUG_CALL("AudioDevicePatternManager with autoSave");
     }
     btnBind("#add-pattern", () => {
         AudioDevicePatternManager.getInstance().addNewPattern();
