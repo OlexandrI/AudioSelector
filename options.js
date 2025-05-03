@@ -703,7 +703,7 @@ class TableHelper {
     }
 
     isDirty() {
-        return this.rows.some((row) => row.isDirty());
+        return this.rows.some((row) => row.isDirty() || row._remove);
     }
 
     hasPermission() {
@@ -771,6 +771,7 @@ class TableHelper {
         _DEBUG_CALL();
         const savePromises = this.rows.map((row) => row.save());
         return Promise.all(savePromises).then(() => {
+            self.rows = self.rows.filter((row) => !row._remove);
             this.updateState();
         }).catch((error) => {
             console.error("Error saving data:", error);
@@ -954,11 +955,16 @@ class AudioDevicePatternManager extends TableHelper {
             await API.storage.local.set(setData).then(() => {
                 _DEBUG_CALL("AudioDevicePatternManager saveAll", setData);
                 self._isDirty = false;
+                self.rows = self.rows.filter((row) => !row._remove);
+                self.rows.forEach((row) => {
+                    row._isDirty = false;
+                    row.updateState();
+                });
             }).catch((error) => {
                 _DEBUG_CALL("AudioDevicePatternManager saveAll", error);
                 console.error("Error saving data:", error);
             });
-            if (!result) _DEBUG_CALL("AudioDevicePatternManager saveAll no all permissions");
+            if (typeof result !== "undefined" && !result) _DEBUG_CALL("AudioDevicePatternManager saveAll no all permissions");
             this.updateState();
             return !self._isDirty;
         }).catch((error) => {
