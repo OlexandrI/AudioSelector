@@ -80,6 +80,16 @@
         height: 0px;
       }
 
+      tr td.state .state-no-permission {
+        display: none;
+      }
+      tr.no-permission td.state .state-no-permission {
+        display: inline-block;
+      }
+
+      td.state, th.state {
+        width: 32px;
+      }
       .field-enabled {
         width: 10%;
       }
@@ -118,6 +128,7 @@
     <table id="meet-support-table">
       <thead>
         <tr>
+          <th class="state"></th>
           <th class="field-enabled">Enabled</th>
           <th class="field-type">Meet type</th>
         </tr>
@@ -140,6 +151,7 @@
     <table id="device-pattern-table">
       <thead>
         <tr>
+          <th class="state"></th>
           <th class="field-url">URL Pattern</th>
           <th class="field-output">Audio Output</th>
           <th class="field-actions">Actions</th>
@@ -149,6 +161,7 @@
       </tbody>
     </table>
     <button id="add-pattern" class="btn add">Add New Pattern</button>
+    <button id="save-patterns" class="btn save">Save</button>
 
     <script src="scripts/audio.js"></script>
     <script src="options.js"></script>

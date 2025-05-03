@@ -49,25 +49,7 @@
       "scripts/background.js"
     ]
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "*://meet.google.com/*"
-      ],
-      "js": [
-        "scripts/gmeet.js"
-      ]
-    },
-    {
-      "matches": [
-        "*://*/*"
-      ],
-      "js": [
-        "scripts/audio.js"
-      ]
-    }
-  ],
-  "host_permissions": [
+  "optional_host_permissions": [
     "*://meet.google.com/*",
     "*://*/*"
   ],

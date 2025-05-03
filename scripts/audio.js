@@ -1,5 +1,8 @@
 // Content script for all tabs to controll audio devices
 
+if (!window._AUDIOSELECTOR_AUDIO) {
+window._AUDIOSELECTOR_AUDIO = true; // Flag to indicate that this script is running
+
 class Modal{
   constructor(title, bodyElement, closeCb = null) {
     this.title = title;
@@ -174,36 +177,38 @@ function AUDIO_GetDeviceLabel(deviceId) {
   return null;
 }
 
-async function AUDIO_EnumareteDevices() {
-  await AUDIO_RequestPermission();
+function AUDIO_EnumareteDevices() {
+  return new Promise(async (resolve) => {
+    await AUDIO_RequestPermission();
 
-  const mediaDevices = {
-    audioinput: [],
-    audiooutput: [],
-    videoinput: [],
-  };
+    const mediaDevices = {
+      audioinput: [],
+      audiooutput: [],
+      videoinput: [],
+    };
 
-  if (navigator.mediaDevices?.enumerateDevices) {
-    let result = await navigator.mediaDevices.enumerateDevices();
-    if (result.filter((device) => device.kind === "audiooutput").length < 1 && navigator.mediaDevices?.selectAudioOutput) {
-      // Still no permission - try to use selectAudioOutput() method
-      try {
-        await navigator.mediaDevices.selectAudioOutput();
-        result = await navigator.mediaDevices.enumerateDevices();
-      } catch (err) { }
-    }
-    result.forEach((device) => {
-      if (!device.label || !device.deviceId) return;
-      mediaDevices[device.kind] = mediaDevices[device.kind] || [];
-      mediaDevices[device.kind].push({
-        label: device.label,
-        deviceId: device.deviceId,
+    if (navigator.mediaDevices?.enumerateDevices) {
+      let result = await navigator.mediaDevices.enumerateDevices();
+      if (result.filter((device) => device.kind === "audiooutput").length < 1 && navigator.mediaDevices?.selectAudioOutput) {
+        // Still no permission - try to use selectAudioOutput() method
+        try {
+          await navigator.mediaDevices.selectAudioOutput();
+          result = await navigator.mediaDevices.enumerateDevices();
+        } catch (err) { }
+      }
+      result.forEach((device) => {
+        if (!device.label || !device.deviceId) return;
+        mediaDevices[device.kind] = mediaDevices[device.kind] || [];
+        mediaDevices[device.kind].push({
+          label: device.label,
+          deviceId: device.deviceId,
+        });
+        AUDIO_SaveDeviceLabel(device.deviceId, device.label);
       });
-      AUDIO_SaveDeviceLabel(device.deviceId, device.label);
-    });
-  }
+    }
 
-  return mediaDevices;
+    resolve(mediaDevices);
+  });
 }
 
 function AUDIO_GetUsedSinkIds() {
@@ -239,17 +244,19 @@ async function AUDIO_SetSinkIdForAll(id) {
   return bResult;
 }
 
-async function AUDIO_GetInfo() {
-  const devices = await AUDIO_EnumareteDevices();
-  const usedSinkIds = AUDIO_GetUsedSinkIds();
+function AUDIO_GetInfo() {
+  return new Promise(async (resolve) => {
+    const devices = await AUDIO_EnumareteDevices();
+    const usedSinkIds = AUDIO_GetUsedSinkIds();
 
-  for (let kind in devices) {
-    devices[kind].forEach((device) => {
-      device.isUsed = usedSinkIds.includes(device.deviceId);
-    });
-  }
+    for (let kind in devices) {
+      devices[kind].forEach((device) => {
+        device.isUsed = usedSinkIds.includes(device.deviceId);
+      });
+    }
 
-  return devices;
+    return resolve(devices);
+  });
 }
 
 async function AUDIO_RequestUserSelectDevice() {
@@ -347,7 +354,7 @@ async function AUDIO_UseDeviceByID(deviceId) {
   return [false, null, null];
 }
 
-async function AUDIO_SelectDevice(label, deviceId) {
+const SelectDevice = async function(label, deviceId) {
   if (!label && !deviceId) {
     return await AUDIO_RequestUserSelectDevice();
   }
@@ -384,4 +391,10 @@ async function AUDIO_SelectDevice(label, deviceId) {
   }
 
   return [false, null, null];
+}
+
+function AUDIO_SelectDevice(label, deviceId) {
+  return SelectDevice(label, deviceId);
+}
+
 }
