@@ -373,7 +373,7 @@ class TableRow {
     genStateCell(stateCell) {
         const noPermission = document.createElement("span");
         noPermission.className = "state-no-permission";
-        noPermission.tooltip = "No permission";
+        noPermission.title = "No permission";
         noPermission.textContent = String.fromCharCode(0x26A0);
         stateCell.appendChild(noPermission);
     }
