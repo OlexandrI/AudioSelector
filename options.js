@@ -373,16 +373,27 @@ class TableRow {
     genStateCell(stateCell) {
         const noPermission = document.createElement("span");
         noPermission.className = "state-no-permission";
-        noPermission.title = "No permission";
-        noPermission.textContent = String.fromCharCode(0x26A0);
+        noPermission.title = "Permission required";
+        noPermission.textContent = "🔒";
         stateCell.appendChild(noPermission);
+        const stateDirty = document.createElement("span");
+        stateDirty.className = "state-dirty";
+        stateDirty.title = "Has not saved changes";
+        stateDirty.textContent = "📝";
+        stateCell.appendChild(stateDirty);
+        const stateOk = document.createElement("span");
+        stateOk.className = "state-ok";
+        stateOk.title = "OK";
+        stateOk.textContent = "🟢";
+        stateCell.appendChild(stateOk);
     }
 
     genActions(actionsCell) {
+        const self = this;
         const removeButton = document.createElement("button");
         removeButton.type = "button";
         removeButton.className = "btn remove small";
-        removeButton.textContent = "Remove";
+        removeButton.textContent = "🗑️";
         removeButton.addEventListener("click", (event) => {
             self.removeHTML();
             self.remove = true;

@@ -15,6 +15,13 @@
       --primary: #0063b1;
       --card-bg: #fff;
       --muted: #555;
+      --add-bg: #4caf50;
+      --add-bg-hover: #43a047;
+      --save-bg: #ffc107;
+      --save-bg-hover: #ffb300;
+      --error: #e53e3e;
+      --succsess-color: #147c18;
+      --warn-color: #ff9800;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -26,6 +33,10 @@
         --primary: #3eaaff;
         --card-bg: #252525;
         --muted: #aaa;
+        --add-bg-hover: #388e3c;
+        --save-bg-hover: #e6ac00;
+        --succsess-color: #4caf50;
+        --warn-color: #ff9800;
       }
     }
 
@@ -92,6 +103,10 @@
       background: rgba(0, 0, 0, 0.05);
     }
 
+    table td.shortcut-name {
+      font-weight: 600;
+    }
+
     /* 5) Column widths */
     .field-state {
       width: 36px;
@@ -103,7 +118,7 @@
     }
 
     .field-actions {
-      width: 100px;
+      width: 32px;
       text-align: center;
     }
 
@@ -141,12 +156,35 @@
     }
 
     .btn.add {
-      background: var(--muted);
+      background: var(--add-bg);
+    }
+
+    .btn.add:hover {
+      background: var(--add-bg-hover);
+    }
+
+    .btn.save {
+      background: var(--save-bg);
+    }
+
+    .btn.save:hover {
+      background: var(--save-bg-hover);
     }
 
     .btn.remove {
       background: transparent;
-      color: #e53e3e;
+      color: var(--error);
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25em;
+    }
+
+    .btn.remove:hover {
+      background: rgba(229, 62, 62, 0.1);
     }
 
     /* 8) Warning box */
@@ -166,10 +204,36 @@
     }
 
     /* 9) State */
-    tr .state-no-permission {
+    tbody td.state {
+      font-size: 1.25em;
+    }
+
+    .state-ok {
+      color: var(--succsess-color);
+    }
+
+    .state-no-permission {
+      color: var(--warn-color);
+    }
+
+    .state-dirty {
+      color: var(--warn-color);
+    }
+
+    tr .state-no-permission,
+    tr .state-dirty,
+    tr.no-permission .state-ok,
+    tr.dirty .state-ok {
       display: none;
     }
-    tr.no-permission .state-no-permission {
+
+    tr.no-permission .state-no-permission,
+    tr.dirty .state-dirty,
+    tr .state-ok {
+      display: block;
+    }
+
+    tr.no-permission.dirty .state-dirty {
       display: none;
     }
   </style>
