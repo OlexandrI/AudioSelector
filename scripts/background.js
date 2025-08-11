@@ -193,7 +193,7 @@ const SelectAudio = {
 
   enumarateDevices: async function (tab) {
     return SelectAudio.executeInTab(tab, () => {
-      return AUDIO_EnumareteDevices();
+      return AUDIO_EnumerateDevices();
     });
   },
 

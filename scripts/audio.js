@@ -4,12 +4,16 @@ if (!window._AUDIOSELECTOR_AUDIO) {
 window._AUDIOSELECTOR_AUDIO = true; // Flag to indicate that this script is running
 
 class Modal{
-  constructor(title, bodyElement, closeCb = null) {
+  constructor(title, bodyElement, closeCb = null, autoCloseDelay = -1) {
     this.title = title;
     this.bodyElement = bodyElement;
     this.closeCb = closeCb;
     this.modalElement = null;
     this.bgElement = null;
+    this.autoCloseDelay = autoCloseDelay;
+    this._autoCloseHandler = null;
+    this._autoCloseDate = null;
+    this._autoCloseElement = null;
   }
 
   _createModal() {
@@ -23,7 +27,7 @@ class Modal{
     this.modalElement.style.transform = "translate(-50%, 0)";
     this.modalElement.style.zIndex = "9999";
     this.modalElement.style.backgroundColor = "white";
-    this.modalElement.style.padding = "20px";
+    this.modalElement.style.padding = "22px 24px 16px 24px";
     this.modalElement.style.borderRadius = "10px";
     this.modalElement.style.boxShadow = "0 0 10px rgba(0, 0, 0, 0.5)";
     this.modalElement.style.width = "300px";
@@ -37,7 +41,7 @@ class Modal{
 
     // Now add title
     const divTitle = document.createElement("h2");
-    divTitle.innerText = "Select audio output device";
+    divTitle.innerText = this.title;
     divTitle.style.marginBottom = "10px";
     this.modalElement.appendChild(divTitle);
 
@@ -52,28 +56,34 @@ class Modal{
     divBody.style.padding = "14px";
     divBody.style.color = "black";
     divBody.style.boxSizing = "border-box";
-    if (typeof this.bodyElement === "string") {
+    if (this.bodyElement instanceof Node) {
+      divBody.appendChild(this.bodyElement);
+    } else {
       const text = document.createElement("p");
       text.innerText = this.bodyElement;
       divBody.appendChild(text);
     }
-    else if (this.bodyElement) {
-      divBody.appendChild(this.bodyElement);
-    }
+    // Add element for auto timer (hidden by default)
+    const autoCloseTimer = document.createElement("div");
+    autoCloseTimer.innerText = `Auto close in ${this.autoCloseDelay} seconds`;
+    autoCloseTimer.style.display = "none"; // Hidden by default
+    autoCloseTimer.classList.add("hidden");
+    divBody.appendChild(autoCloseTimer);
+    this._autoCloseElement = autoCloseTimer;
     this.modalElement.appendChild(divBody);
 
     // Add close button to right top corner
     const closeButton = document.createElement("button");
     closeButton.innerText = "X";
     closeButton.style.position = "absolute";
-    closeButton.style.top = "10px";
-    closeButton.style.right = "10px";
+    closeButton.style.top = "6px";
+    closeButton.style.right = "6px";
     closeButton.style.backgroundColor = "red";
     closeButton.style.color = "white";
     closeButton.style.border = "none";
     closeButton.style.borderRadius = "5px";
     closeButton.style.cursor = "pointer";
-    closeButton.style.padding = "5px 10px";
+    closeButton.style.padding = "2px 6px";
     closeButton.style.fontWeight = "bold";
     this.modalElement.appendChild(closeButton);
 
@@ -112,6 +122,29 @@ class Modal{
     }
   }
 
+  _updateAutoCloseTimerLabel() {
+    if (this._autoCloseElement) {
+      this._autoCloseElement.innerText = `Auto close in ${this.autoCloseRemainingSeconds()} seconds`;
+      this._autoCloseElement.classList.remove("timer_progress_100");
+      this._autoCloseElement.classList.remove("timer_progress_75");
+      this._autoCloseElement.classList.remove("timer_progress_50");
+      this._autoCloseElement.classList.remove("timer_progress_25");
+      this._autoCloseElement.classList.remove("timer_progress_0");
+      const currentProgress = this.autoCloseRemainingSeconds() / this.autoCloseDelay * 100;
+      if (currentProgress > 80) {
+        this._autoCloseElement.classList.add("timer_progress_100");
+      } else if (currentProgress > 60) {
+        this._autoCloseElement.classList.add("timer_progress_75");
+      } else if (currentProgress > 35) {
+        this._autoCloseElement.classList.add("timer_progress_50");
+      } else if (currentProgress > 15) {
+        this._autoCloseElement.classList.add("timer_progress_25");
+      } else {
+        this._autoCloseElement.classList.add("timer_progress_0");
+      }
+    }
+  }
+
   show(closeCb = undefined) {
     if (typeof closeCb !== "undefined") {
       this.closeCb = closeCb;
@@ -121,6 +154,9 @@ class Modal{
       document.body.appendChild(this.bgElement);
       document.body.appendChild(this.modalElement);
     }
+    if (this.autoCloseDelay > 0) {
+      this.autoCloseAfter(this.autoCloseDelay);
+    }
   }
 
   close() {
@@ -129,6 +165,31 @@ class Modal{
     if (typeof this.closeCb === "function") {
       this.closeCb();
     }
+  }
+
+  autoCloseAfter(seconds) {
+    const self = this;
+    this._autoCloseHandler = setTimeout(() => {
+      self.close();
+    }, seconds * 1000);
+    this._autoCloseDate = new Date(Date.now() + seconds * 1000);
+    if (this._autoCloseElement) {
+      this._autoCloseElement.style.display = "block";
+      this._autoCloseElement.classList.remove("hidden");
+      this._autoCloseElement.classList.add("timer_progress_100");
+      // Periodic update the timer text (every ~250ms)
+      this._autoCloseInterval = setInterval(() => {
+        self._updateAutoCloseTimerLabel();
+      }, 250);
+    }
+  }
+
+  autoCloseRemainingSeconds() {
+    if (this._autoCloseDate) {
+      const remainingTime = this._autoCloseDate - Date.now();
+      return Math.max(0, Math.ceil(remainingTime / 1000));
+    }
+    return 0;
   }
 }
 
@@ -158,8 +219,14 @@ async function AUDIO_RequestPermission() {
     console.warn("[AudioSelector] getUserMedia not supported!");
   }
 
+  // Show modal to user with warning info
+  // and 5 seconds timer for auto close
+  const modal = new Modal("Audio Permission Required", "Please grant audio permission to use this feature.", null, 5);
+  modal.show();
+
   console.warn("[AudioSelector] RequestPermission: no permission granted!");
   window.AUDIO_REQUESTED = false;
+
   return false;
 }
 
@@ -177,7 +244,7 @@ function AUDIO_GetDeviceLabel(deviceId) {
   return null;
 }
 
-function AUDIO_EnumareteDevices() {
+function AUDIO_EnumerateDevices() {
   return new Promise(async (resolve) => {
     await AUDIO_RequestPermission();
 
@@ -211,6 +278,34 @@ function AUDIO_EnumareteDevices() {
   });
 }
 
+async function AUDIO_WatchMediaElement(element, id) {
+  if (element instanceof HTMLMediaElement) {
+    // Always store selected sinkId
+    element.setAttribute("data-audio-selector-sink-id", id);
+
+    // Check, maybe me watching it now
+    if (element.hasAttribute("data-audio-selector-watching")) return;
+    element.setAttribute("data-audio-selector-watching", "true");
+
+    // On emptied event - clear the sinkId
+    // It need to fix bug when after change audio source device works incorrectly
+    element.addEventListener("emptied", () => {
+      element.setSinkId("");
+    });
+    element.addEventListener("ended", () => {
+      element.setSinkId("");
+    });
+
+    // And reset sinkId when started
+    element.addEventListener("playing", () => {
+      element.setSinkId(element.getAttribute("data-audio-selector-sink-id"));
+    });
+
+    // Check if the sinkId is different
+    if (element.sinkId !== id) await element.setSinkId(id);
+  }
+}
+
 function AUDIO_GetUsedSinkIds() {
   const usedSinkIds = new Set();
   const elems = document.querySelectorAll("audio, video");
@@ -221,10 +316,9 @@ function AUDIO_GetUsedSinkIds() {
 }
 
 function AUDIO_CheckSinkIdOnAll(id) {
-  const elems = document.querySelectorAll("audio, video");
-  let result = elems.length > 0;
-  elems.forEach((el) => result = result && el.sinkId === id);
-  return result;
+  const elems = Array.from(document.querySelectorAll("audio, video"));
+  if (elems.length === 0) return false;
+  return elems.every((el) => el.sinkId === id);
 }
 
 async function AUDIO_SetSinkIdForAll(id) {
@@ -232,12 +326,13 @@ async function AUDIO_SetSinkIdForAll(id) {
   const elems = document.querySelectorAll("audio, video");
   for (let i = 0; i < elems.length; i++) {
     const el = elems[i];
-    if (el.sinkId !== id) {
-      try {
-        await el.setSinkId(id);
-      } catch (err) {
-        bResult = false;
-        break;
+    if (el instanceof HTMLMediaElement) {
+      if (el.sinkId !== id) {
+        try {
+          await AUDIO_WatchMediaElement(el, id);
+        } catch (err) {
+          bResult = false;
+        }
       }
     }
   }
@@ -246,7 +341,7 @@ async function AUDIO_SetSinkIdForAll(id) {
 
 function AUDIO_GetInfo() {
   return new Promise(async (resolve) => {
-    const devices = await AUDIO_EnumareteDevices();
+    const devices = await AUDIO_EnumerateDevices();
     const usedSinkIds = AUDIO_GetUsedSinkIds();
 
     for (let kind in devices) {
@@ -294,7 +389,7 @@ async function AUDIO_RequestUserSelectDevice() {
         }
       }
       
-      const devices = await AUDIO_EnumareteDevices();
+      const devices = await AUDIO_EnumerateDevices();
       const audioOutputDevices = devices.audiooutput || [];
 
       const defaultOption = document.createElement("option");
@@ -310,7 +405,7 @@ async function AUDIO_RequestUserSelectDevice() {
     };
     const modal = new Modal("Select audio output device", selectDevices);
     // Bind event to select
-    const promise = await (new Promise(async (resolve) => {
+    return await (new Promise(async (resolve) => {
       const handle = setTimeout(() => {
         modal.close();
         resolve([false, null, null]);
@@ -338,17 +433,15 @@ async function AUDIO_RequestUserSelectDevice() {
       genOptions();
       modal.show();
     }));
-
-    return promise;
   }
 }
 
-async function AUDIO_UseDeviceByID(deviceId) {
+async function AUDIO_UseDeviceByID(deviceId, label = "User defined") {
   if (AUDIO_CheckSinkIdOnAll(deviceId)) {
-    return [true, AUDIO_GetDeviceLabel(deviceId) || "User defined", deviceId];
+    return [true, AUDIO_GetDeviceLabel(deviceId) || label || "Some AudioOutput Device", deviceId];
   }
   if (await AUDIO_SetSinkIdForAll(deviceId)) {
-    return [true, AUDIO_GetDeviceLabel(deviceId) || "User defined", deviceId];
+    return [true, AUDIO_GetDeviceLabel(deviceId) || label || "Some AudioOutput Device", deviceId];
   }
 
   return [false, null, null];
@@ -359,23 +452,24 @@ const SelectDevice = async function(label, deviceId) {
     return await AUDIO_RequestUserSelectDevice();
   }
 
+  let device = null;
+  if (deviceId && navigator.mediaDevices?.selectAudioOutput) {
+    try {
+      device = await navigator.mediaDevices.selectAudioOutput({ deviceId });
+      AUDIO_SaveDeviceLabel(device.deviceId, device.label || label || "Some AudioOutput Device");
+    } catch (err) { }
+  }
+
   if (deviceId)
   {
-    const result = await AUDIO_UseDeviceByID(deviceId);
+    const result = await AUDIO_UseDeviceByID(deviceId, label);
     if (result[0]) {
       return result;
     }
   }
 
-  let device = null;
-  if (deviceId && navigator.mediaDevices?.selectAudioOutput) {
-    try {
-      device = await navigator.mediaDevices.selectAudioOutput({ deviceId });
-    } catch (err) { }
-  }
-
   if (!device) {
-    let devices = await AUDIO_EnumareteDevices();
+    let devices = await AUDIO_EnumerateDevices();
     // If no - try to find
     if (deviceId) {
       device = devices?.audiooutput?.length > 0 ? devices.audiooutput.find((device) => device.deviceId === deviceId) : null;
@@ -386,8 +480,8 @@ const SelectDevice = async function(label, deviceId) {
   }
 
   if (device) {
-    AUDIO_SaveDeviceLabel(device.deviceId, device.label || "Default");
-    return await AUDIO_UseDeviceByID(device.deviceId);
+    AUDIO_SaveDeviceLabel(device.deviceId, device.label || "Some AudioOutput Device");
+    return await AUDIO_UseDeviceByID(device.deviceId, device.label);
   }
 
   return [false, null, null];
