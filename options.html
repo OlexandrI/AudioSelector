@@ -1,101 +1,251 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="color-scheme" content="dark light">
-    <title>Extension Options</title>
-    <style>
-      body {
-        min-width: 768px;
-        max-width: 960px;
-        width: 75%;
-        margin: auto;
-        padding: 10px 0px;
-        font-size: 14px;
-      }
-      hr {
-        margin: 20px auto;
-        width: 96%;
-        border-color: grey;
-        border-style: dashed;
-      }
-      p {
-        font-size: 0.9em;
-        text-align: justify;
-      }
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        table-layout: fixed;
-      }
-      th, td {
-        border: 0px solid #ddd;
-        padding: 8px;
-        text-align: left;
-      }
-      th {
-        font-weight: bold;
-      }
-      input[type="text"] {
-        cursor: pointer;
-      }
-      .remove-button {
-        color: red;
-        cursor: pointer;
-      }
-      .btn {
-        padding: 8px 16px;
-        margin: 2px 4px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-      }
-      .btn.small {
-        padding: 5px 10px;
-        margin: 2px 4px;
-        font-size: 0.8em;
-      }
-      select, input[type="text"] {
-        width: 100%;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-      }
-      select {
-        padding: 2px 5px;
-      }
-      input[type="text"] {
-        line-height: 1.5;
-      }
-      .warning {
-        color: #ffffb2;
-        font-style: italic;
-        padding-left: 3.2em;
-      }
-      .warning::before {
-        content: "⚠️ ";
-        font-size: 2em;
-        font-style: normal;
-        margin-left: -1.6em;
-        display: block;
-        height: 0px;
-      }
 
-      .field-enabled {
-        width: 10%;
-      }
-      .shortcut-name {
-        width: 20%;
-      }
-      .field-url {
-        width: 33.33%;
-      }
-      .field-actions {
-        width: 16.66%;
-      }
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="dark light">
+  <title>Extension Options</title>
+  <style>
+    /* 1) Define palette */
+    :root {
+      --bg: #fafafa;
+      --fg: #222;
+      --border: #ddd;
+      --header-bg: #f0f0f0;
+      --primary: #0063b1;
+      --card-bg: #fff;
+      --muted: #555;
+      --add-bg: #4caf50;
+      --add-bg-hover: #43a047;
+      --save-bg: #ffc107;
+      --save-bg-hover: #ffb300;
+      --error: #e53e3e;
+      --succsess-color: #147c18;
+      --warn-color: #ff9800;
+    }
 
-    </style>
-  </head>
-  <body>
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1e1e1e;
+        --fg: #ddd;
+        --border: #444;
+        --header-bg: #2a2a2a;
+        --primary: #3eaaff;
+        --card-bg: #252525;
+        --muted: #aaa;
+        --add-bg-hover: #388e3c;
+        --save-bg-hover: #e6ac00;
+        --succsess-color: #4caf50;
+        --warn-color: #ff9800;
+      }
+    }
+
+    /* 2) Base reset */
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: sans-serif;
+      margin: 0 auto;
+      padding: 20px;
+      max-width: 900px;
+      line-height: 1.4;
+    }
+
+    h2 {
+      margin-top: 0;
+      color: var(--primary);
+      font-size: 1.4em;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    /* 3) Card wrapper */
+    .section {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* 4) Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+
+    thead {
+      background: var(--header-bg);
+    }
+
+    th,
+    td {
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    th {
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    tbody tr:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    table td.shortcut-name {
+      font-weight: 600;
+    }
+
+    /* 5) Column widths */
+    .field-state {
+      width: 36px;
+    }
+
+    .field-enabled {
+      width: 60px;
+      text-align: center;
+    }
+
+    .field-actions {
+      width: 32px;
+      text-align: center;
+    }
+
+    /* 6) Form controls */
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg);
+      color: var(--fg);
+    }
+
+    input[type="checkbox"] {
+      transform: scale(1.2);
+    }
+
+    /* 7) Buttons */
+    .btn {
+      display: inline-block;
+      padding: 8px 16px;
+      margin: 4px 2px;
+      border: none;
+      border-radius: 4px;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+
+    .btn[disabled] {
+      background: var(--muted) !important;
+      cursor: not-allowed;
+    }
+
+    .btn.small {
+      padding: 6px 12px;
+      font-size: 0.8em;
+    }
+
+    .btn.add {
+      background: var(--add-bg);
+    }
+
+    .btn.add:hover {
+      background: var(--add-bg-hover);
+    }
+
+    .btn.save {
+      background: var(--save-bg);
+    }
+
+    .btn.save:hover {
+      background: var(--save-bg-hover);
+    }
+
+    .btn.remove {
+      background: transparent;
+      color: var(--error);
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25em;
+    }
+
+    .btn.remove:hover {
+      background: rgba(229, 62, 62, 0.1);
+    }
+
+    /* 8) Warning box */
+    .warning {
+      background: rgba(255, 229, 100, 0.2);
+      border-left: 4px solid var(--primary);
+      padding: 12px;
+      border-radius: 4px;
+      font-style: normal;
+      color: var(--muted);
+      margin: 16px 0;
+    }
+
+    .warning::before {
+      content: "⚠️";
+      margin-right: 8px;
+    }
+
+    /* 9) State */
+    tbody td.state {
+      font-size: 1.25em;
+    }
+
+    .state-ok {
+      color: var(--succsess-color);
+    }
+
+    .state-no-permission {
+      color: var(--warn-color);
+    }
+
+    .state-dirty {
+      color: var(--warn-color);
+    }
+
+    tr .state-no-permission,
+    tr .state-dirty,
+    tr.no-permission .state-ok,
+    tr.dirty .state-ok {
+      display: none;
+    }
+
+    tr.no-permission .state-no-permission,
+    tr.dirty .state-dirty,
+    tr .state-ok {
+      display: block;
+    }
+
+    tr.no-permission.dirty .state-dirty {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="section">
     <h2>Keyboard shortcuts</h2>
     <p>Keyboard shortcuts are available for the following actions:</p>
     <table id="keyboard-shortcut-table">
@@ -110,14 +260,15 @@
     </table>
     <button id="keyboard-shortcut-reset" class="btn reset hide-on-chrome">Reset to Default</button>
     <button id="keyboard-shortcut-settings" class="btn openpage hide-on-chrome">Open in shortcuts settings</button>
+  </div>
 
-    <hr />
-
+  <div class="section">
     <h2>Tabs with Meet supports</h2>
     <p>Meet supports the following types of tabs:</p>
     <table id="meet-support-table">
       <thead>
         <tr>
+          <th class="state"></th>
           <th class="field-enabled">Enabled</th>
           <th class="field-type">Meet type</th>
         </tr>
@@ -125,21 +276,25 @@
       <tbody>
       </tbody>
     </table>
-    
-    <hr />
+  </div>
 
+  <div class="section">
     <h2>Device Selection by URL Pattern</h2>
-    <p id="audio-select-warn-firefox" class="warning hide-on-chrome" style="display:none;">Please set 'media.setsinkid.enabled' to 'true' in 'about:config'!</p>
+    <p id="audio-select-warn-firefox" class="warning hide-on-chrome" style="display:none;">Please set
+      'media.setsinkid.enabled' to 'true' in 'about:config'!</p>
     <p class="warning">
       This is an experimental feature that may not work stably.
-      Also, due to security restrictions, there is no direct access to devices and no ability to always directly set the selected device.
+      Also, due to security restrictions, there is no direct access to devices and no ability to always directly set the
+      selected device.
       Therefore, the user should be prompted once to select a device for a tab.
       Additionally, this feature may not work correctly with devices that are dynamically connected.
-      To obtain device selection rights, access to the microphone will be requested. Unfortunately, this is currently the only way to obtain these rights, the microphone itself will not be used by the application in any way.
+      To obtain device selection rights, access to the microphone will be requested. Unfortunately, this is currently
+      the only way to obtain these rights, the microphone itself will not be used by the application in any way.
     </p>
     <table id="device-pattern-table">
       <thead>
         <tr>
+          <th class="state"></th>
           <th class="field-url">URL Pattern</th>
           <th class="field-output">Audio Output</th>
           <th class="field-actions">Actions</th>
@@ -149,8 +304,14 @@
       </tbody>
     </table>
     <button id="add-pattern" class="btn add">Add New Pattern</button>
+    <button id="save-patterns" class="btn save">Save</button>
+    <button id="permisions-patterns" class="btn permissions">Request permissions</button>
+  </div>
 
-    <script src="scripts/audio.js"></script>
-    <script src="options.js"></script>
-  </body>
+  <script src="scripts/audio.js"></script>
+  <script src="scripts/helpers.js"></script>
+  <script src="scripts/TableHelper.js"></script>
+  <script src="scripts/options.js"></script>
+</body>
+
 </html>

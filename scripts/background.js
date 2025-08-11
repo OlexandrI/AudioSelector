@@ -177,9 +177,23 @@ const Helpers = {
 };
 
 const SelectAudio = {
+  executeInTab: async function (tab, func, args = []) {
+    return new Promise(async (resolve, reject) => {
+      const result = await Helpers.injectScript(tab, "scripts/audio.js");
+      if (!result) {
+        return resolve(null);
+      }
+      Helpers.executeInTab(tab, func, args).then((result) => {
+        resolve(result);
+      }).catch((error) => {
+        resolve(null);
+      });
+    });
+  },
+
   enumarateDevices: async function (tab) {
-    return Helpers.executeInTab(tab, () => {
-      return AUDIO_EnumareteDevices();
+    return SelectAudio.executeInTab(tab, () => {
+      return AUDIO_EnumerateDevices();
     });
   },
 
@@ -193,7 +207,7 @@ const SelectAudio = {
         id = storedId;
       }
     }
-    const result = await Helpers.executeInTab(resolvedTab, (label, id) => {
+    const result = await SelectAudio.executeInTab(resolvedTab, (label, id) => {
       return AUDIO_SelectDevice(label, id);
     }, [label, id]);
 
@@ -239,10 +253,83 @@ const SelectAudio = {
 
 
 class MeetTabsManager {
-  constructor(key) {
-    this.key = key;
-    this.urlPattern = "*://domain.com/*";
+  constructor(name, url, script) {
+    this.name = name;
+    this.urlPattern = url;
+    this.script = script;
     this.urlRegExp = null;
+    this.enabled = false;
+    this.checkEnabled();
+  }
+
+  key() {
+      return "enable" + this.name + "Tabs";
+  }
+
+  id() {
+    return "MeetSupportScript_" + this.key();
+  }
+
+  isEnabled() {
+    return this.enabled;
+  }
+
+  setEnabled(enabled) {
+    if (this.enabled === !!enabled)
+    {
+      return;
+    }
+
+    const self = this;
+    // If enabled - register content script
+    if (enabled) {
+      API.scripting.getRegisteredContentScripts({ids: [self.id()]}).then((registered) => {
+        if (registered.length > 0) {
+          const registeredIndx = registered.findIndex((script) => script.id === self.id());
+          if (registeredIndx !== -1) {
+            console.info(`Content script ${self.id()} is already registered.`);
+            return;
+          }
+        }
+
+        API.scripting.registerContentScripts([
+          {
+            id: self.id(),
+            matches: [this.urlPattern],
+            js: [self.script],
+            allFrames: true,
+            runAt: "document_start",
+          },
+        ]).then(() => {
+          console.info(`Content script ${self.id()} registered.`);
+          self.enabled = true;
+        }).catch((error) => {
+          console.error(`Error registering content script for ${self.key()}: ${error}`);
+        });
+      });
+    } else {
+      self.enabled = false;
+      API.scripting.getRegisteredContentScripts({ids: [self.id()]}).then((registered) => {
+        if (registered.length > 0) {
+          const registeredIndx = registered.findIndex((script) => script.id === self.id());
+          if (registeredIndx !== -1) {
+            API.scripting.unregisterContentScripts({ids: [self.id()]}).then(() => {
+              console.info(`Content script ${self.id()} unregistered.`);
+            }).catch((error) => {
+              console.error(`Error unregistering content script for ${self.key()}: ${error}`);
+            });
+          }
+        }
+      });
+    }
+  }
+
+  checkEnabled() {
+    const self = this;
+    return Helpers.getStorageValue(this.key(), true).then((enabled) => {
+      self.setEnabled(enabled);
+      return self.enabled;
+    });
   }
 
   // Check tab is this type of meet tab
@@ -267,6 +354,7 @@ class MeetTabsManager {
   }
 
   async inject(tab) {
+    return await Helpers.injectScript(tab, this.script);
   }
 
   // Get tab info from the meet tab
@@ -374,12 +462,7 @@ class MeetTabsManager {
 
 class GoogleMeetTabsManager extends MeetTabsManager {
   constructor() {
-    super("gmeet");
-    this.urlPattern = "*://meet.google.com/*";
-  }
-
-  async inject(tab) {
-    return await Helpers.injectScript(tab, "scripts/gmeet.js");
+    super("GoogleMeet", "*://meet.google.com/*", "scripts/gmeet.js");
   }
 
   async getState(tab) {
@@ -407,15 +490,14 @@ class GoogleMeetTabsManager extends MeetTabsManager {
   }
 }
 
-const MeetManagers = [ ];
-
-if (Helpers.getStorageValue("enableGoogleMeetTabs", true)) {
-  MeetManagers.push(new GoogleMeetTabsManager());
-}
+const MeetManagers = [
+  new GoogleMeetTabsManager()
+];
 
 async function GetTabWithInMeeting() {
   const allInMeetingTabs = [];
   for (const manager of MeetManagers) {
+    if (!manager.isEnabled()) continue;
     const tabs = await manager.getTabsWithInMeeting();
     if (tabs.length > 0) {
       allInMeetingTabs.push(...tabs.map((tab) => [manager, tab]));
@@ -438,6 +520,7 @@ async function GetTabWithInMeeting() {
 
 async function MeetSwitchToNextTab() {
   for (const manager of MeetManagers) {
+    if (!manager.isEnabled()) continue;
     const hasInMeetTabs = await manager.hasInMeetTabs();
     if (!hasInMeetTabs) {
       continue;
@@ -449,6 +532,7 @@ async function MeetSwitchToNextTab() {
   }
 
   for (const manager of MeetManagers) {
+    if (!manager.isEnabled()) continue;
     const tabs = await manager.queryTabs();
     if (tabs.length < 1) {
       continue;
@@ -464,7 +548,7 @@ async function MeetSwitchToNextTab() {
 }
 
 async function MeetJoin() {
-  const allTabs = MeetManagers.map(async (manager) => (await manager.queryTabsWithState()).map((tab) => [manager, tab])).flat(1);
+  const allTabs = MeetManagers.map(async (manager) => (manager.isEnabled() ? await manager.queryTabsWithState() : []).map((tab) => [manager, tab])).flat(1);
   const inMeetTab = allTabs.find((tab) => tab[1].inMeeting);
   const notInMeetingTabs = allTabs.filter((tab) => !tab[1].inMeeting);
   if (!inMeetTab && notInMeetingTabs.length === 1) {
@@ -496,12 +580,26 @@ async function MeetToggleMuteCamera() {
 
 async function injectMeetContentScript(tab) {
   for (const manager of MeetManagers) {
+    if (!manager.isEnabled()) continue;
     if (manager.isTab(tab)) {
       await manager.inject(tab);
       return true;
     }
   }
   return false;
+}
+
+
+function onSettingsChange(changes) {
+  const changedItems = Object.keys(changes);
+
+  for (const item of changedItems) {
+    if (item.startsWith("enable")) for (const manager of MeetManagers) {
+      if (manager.key() === item) {
+        manager.setEnabled(changes[item].newValue);
+      }
+    }
+  }
 }
 
 
@@ -543,3 +641,6 @@ API.tabs.onRemoved.addListener(
     Helpers.remove("manualAudioDevice", tabId);
   }
 );
+
+// Listen for settings (local storage) changes
+API.storage.local.onChanged.addListener(onSettingsChange);
