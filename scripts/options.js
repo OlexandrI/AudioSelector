@@ -1,4 +1,4 @@
-const API = browser ?? chrome; // For compatibility with Chrome and Firefox
+const API = (typeof browser !== "undefined") ? browser : chrome; // For compatibility with Chrome and Firefox
 const IS_CHROME_ENV = typeof chrome !== "undefined" && typeof browser === "undefined";
 const DATA_PATTERNS = "patterns";
 
