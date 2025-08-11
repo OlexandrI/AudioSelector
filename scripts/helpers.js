@@ -125,12 +125,26 @@ function elementsDo(selector, cb) {
 }
 
 /**
+ * Sets the visibility of elements matching the given selector.
+ *
+ * @param {Array<HTMLElement>|HTMLElement|NodeList|DocumentFragment|string|any} selector - A CSS selector string used to resolve elements.
+ * @param {boolean} visible - A boolean indicating whether to show or hide the elements.
+ * @throws {Error} - Throws an error if `resolveElements` returns an unexpected type.
+ */
+function setVisibility(selector, visible) {
+    elementsDo(selector, (element) => {
+        element.style.display = visible ? "block" : "none";
+    });
+}
+
+/**
  * Determines whether the elements matching the given selector are visible.
  *
  * @param {Array<HTMLElement>|HTMLElement|NodeList|DocumentFragment|string|any} selector - A CSS selector string used to resolve elements.
  * @returns {boolean} Returns `true` if all resolved elements are visible; otherwise, `false`.
  *                    An element is considered not visible if its `display` style is "none"
  *                    or its `visibility` style is "hidden".
+ * @throws {Error} - Throws an error if `resolveElements` returns an unexpected type.
  */
 function isVisible(selector) {
     const elements = resolveElements(selector);
@@ -182,6 +196,7 @@ function removeAllChildrenFor(selector) {
  * @param {Array<HTMLElement>|HTMLElement|NodeList|DocumentFragment|string|any} selector - A CSS selector string used to resolve elements.
  * @param {(this: HTMLElement, event: Event) => boolean|void} callback - A function to execute when the click event occurs.
  *        The function receives the event object as an argument and can optionally return `true` to prevent the default action.
+ * @throws {Error} - Throws an error if `resolveElements` returns an unexpected type.
  */
 function btnBind(selector, callback) {
     // Bake event handler
@@ -206,6 +221,7 @@ function btnBind(selector, callback) {
  * @param {(this: HTMLElement, event: Event) => boolean|void} callback - A function to execute when the click event occurs.
  *        The function receives the event object as an argument and can optionally return `true` to prevent the default action.
  * @returns {boolean[]} - An array of booleans indicating whether the event listener was successfully added to each visible element.
+ * @throws {Error} - Throws an error if `resolveElements` returns an unexpected type.
  */
 function btnBindVisible(selector, callback) {
     // Bake event handler
