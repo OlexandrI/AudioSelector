@@ -8,7 +8,7 @@
 if (!window._AUDIOSELECTOR_GMEETSUPPORT) {
 window._AUDIOSELECTOR_GMEETSUPPORT = true; // Flag to indicate that this script is running
 
-const JOIN_BTN_SELECTOR = '[jsname="Qx7uuf"]';
+const JOIN_BTN_SELECTOR = '[jsname="Qx7uuf"] button';
 const MUTE_BTNS_SELECTOR = '[data-is-muted] > div';
 const MIC_BTN_SELECTOR = '[data-is-muted][jsname="hw0c9"] > div';
 const CAM_BTN_SELECTOR = '[data-is-muted][jsname="psRWwc"] > div';

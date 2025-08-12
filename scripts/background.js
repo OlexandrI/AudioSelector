@@ -4,7 +4,12 @@ const IS_CHROME = typeof chrome !== "undefined";
 const API = typeof browser !== "undefined" ? browser : chrome;
 const DATA_PATTERNS = "patterns";
 
+// Helper functions for tab management
 const Helpers = {
+  /**
+   * Get the currently active tab in the current window.
+   * @returns {Promise<tabs.Tab|null>} The active tab or null if not found.
+   */
   activeTab: async function () {
     const tabs = await API.tabs.query({ active: true, currentWindow: true }).catch((error) => {
       console.error(`Error querying active tab: ${error}`);
@@ -16,6 +21,12 @@ const Helpers = {
     return null;
   },
 
+  /**
+   * Resolve a tab object from various input types or get active tab if input isn't tab or tab id number.
+   * @param {tabs.Tab|number|any} tab The tab identifier (ID, object, or other).
+   * @returns {Promise<tabs.Tab|null>} The resolved tab or null if not found.
+   * @nothrows If the input is invalid or the tab cannot be found, this function will not throw an error.
+   */
   resolveTab: async function (tab) {
     if (tab && typeof tab === "object" && tab.hasOwnProperty("id")) {
       return tab;
@@ -32,6 +43,14 @@ const Helpers = {
     return Helpers.activeTab();
   },
 
+  /**
+   * Execute a function in the context of a tab.
+   * @param {tabs.Tab|number|any} tab The tab identifier (ID, object, or other).
+   * @param {Function} func The function to execute.
+   * @param {Array} args The arguments to pass to the function.
+   * @returns {Promise<any|null>} The result of the function execution or null if failed.
+   * @nothrows If the tab is not found or the script fails to execute, this function will not throw an error.
+   */
   executeInTab: async function (tab, func, args = []) {
     const resolvedTab = await Helpers.resolveTab(tab);
     if (!resolvedTab) {
@@ -61,6 +80,13 @@ const Helpers = {
     return results[0].result;
   },
 
+  /**
+   * Inject a script into a tab.
+   * @param {tabs.Tab|number|any} tab The tab identifier (ID, object, or other).
+   * @param {string} script The script to inject.
+   * @returns {Promise<boolean>} True if the script was injected successfully, false otherwise.
+   * @nothrows If the tab is not found or the script fails to inject, this function will not throw an error.
+   */
   injectScript: async function (tab, script) {
     const resolvedTab = await Helpers.resolveTab(tab);
     if (!resolvedTab) {
@@ -69,7 +95,7 @@ const Helpers = {
     }
 
     try {
-      const result = await API.scripting.executeScript({
+      await API.scripting.executeScript({
         target: { tabId: resolvedTab.id },
         files: [script],
       });
@@ -80,6 +106,13 @@ const Helpers = {
     }
   },
 
+  /**
+   * Focus a tab and optionally unmute it.
+   * @param {tabs.Tab|number|any} tab The tab identifier (ID, object, or other).
+   * @param {boolean} unmute Whether to unmute the tab (Default: false).
+   * @returns {Promise<boolean>} True if the tab was focused successfully, false otherwise.
+   * @nothrows If the tab is not found or the focus action fails, this function will not throw an error.
+   */
   focusTab: async function (tab, unmute = false) {
     const resolvedTab = await Helpers.resolveTab(tab);
     if (!resolvedTab) {
@@ -89,43 +122,41 @@ const Helpers = {
 
     // Make tab and window active
     console.log(`Making tab ${resolvedTab.title} active`);
-    // We need to be sure that window with this tab is active
-    let result = await API.windows.update(resolvedTab.windowId, {
-      focused: true,
-    }).catch((error) => {
-      console.error(`Error switching to window ${resolvedTab.windowId}: ${error}`);
-      return false;
-    }).then(() => {
+    try {
+      // We need to be sure that window with this tab is active
+      await API.windows.update(resolvedTab.windowId, { focused: true });
+      // Switch to the tab
+      await API.tabs.update(resolvedTab.id, unmute ? { muted: false, active: true } : { active: true });
       return true;
-    });
-
-    // Switch to the tab
-    result = result && await API.tabs.update(resolvedTab.id, unmute ? {
-      muted: false,
-      active: true,
-    } : {
-      active: true,
-    }).catch((error) => {
+    } catch (error) {
       console.error(`Error switching to tab ${resolvedTab.id}: ${error}`);
       return false;
-    }).then(() => {
-      return true;
-    });
-
-    return result;
+    }
   },
 
+  /**
+   * Open a new tab with the specified URL.
+   * @param {string} url The URL to open in the new tab.
+   * @returns {Promise<tabs.Tab|null>} The created tab object or null if failed.
+   * @nothrows If the URL is invalid or the tab cannot be created, this function will not throw an error.
+   *
+   * @note To detect when the tab has finished loading, listen to the tabs.onUpdated or the
+   * webNavigation.onCompleted event before calling tabs.create.
+   */
   openTab: function (url) {
-    const createData = {
-      url: url,
-      active: true,
-    };
-    return API.tabs.create(createData).catch((error) => {
+    return API.tabs.create({ url, active: true }).catch((error) => {
       console.error(`Error creating tab with URL ${url}: ${error}`);
       return null;
     });
   },
 
+  /**
+   * Get a value from storage.
+   * @param {string} key The key to retrieve.
+   * @param {any} defaultValue The default value to return if the key is not found (Default: null).
+   * @returns {Promise<any>} The stored value or the default value.
+   * @nothrows If the key is not found or an error occurs, this function will not throw an error.
+   */
   getStorageValue: async function (key, defaultValue = null) {
     try {
       return await API.storage.local.get(key).then((data) => {
@@ -141,9 +172,23 @@ const Helpers = {
     return defaultValue;
   },
 
+  /**
+   * Convert a wildcard pattern to a regular expression.
+   * @param {string} pattern The wildcard pattern to convert.
+   * @returns {RegExp} The resulting regular expression.
+   */
+  wildcardToRegExp: function (pattern) {
+    if (!pattern || typeof pattern !== "string") return /^$/i;
+    const escaped = pattern
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*")
+      .replace(/\?/g, ".");
+    return new RegExp("^" + escaped + "$", "i");
+  },
+
   store: {},
-  get: function(key, defaultValue = null) {
-    return Helpers.store[key] !== undefined ? Helpers.store[key] : defaultValue;
+  get: function(key, defValue = null) {
+    return Helpers.store[key] !== undefined ? Helpers.store[key] : defValue;
   },
   set: function(key, value) {
     Helpers.store[key] = value;
@@ -177,28 +222,45 @@ const Helpers = {
 };
 
 const SelectAudio = {
+  /**
+   * Execute a function in the context of a specific tab but ensure before that audio helpers injected.
+   * @param {tabs.Tab|number|any} tab The tab to execute the function in.
+   * @param {Function} func The function to execute.
+   * @param {Array} args The arguments to pass to the function.
+   * @returns {Promise<any>} The result of the function execution or null if failed.
+   * @nothrows If the tab is not found or the script fails to execute, this function will not throw an error.
+   */
   executeInTab: async function (tab, func, args = []) {
-    return new Promise(async (resolve, reject) => {
-      const result = await Helpers.injectScript(tab, "scripts/audio.js");
-      if (!result) {
-        return resolve(null);
-      }
-      Helpers.executeInTab(tab, func, args).then((result) => {
-        resolve(result);
-      }).catch((error) => {
-        resolve(null);
-      });
-    });
+    const ok = await Helpers.injectScript(tab, "scripts/audio.js");
+    if (!ok) return null;
+    return await Helpers.executeInTab(tab, func, args);
   },
 
-  enumarateDevices: async function (tab) {
-    return SelectAudio.executeInTab(tab, () => {
+  /**
+   * Enumerate audio input/output devices.
+   * @param {tabs.Tab|number|any} tab The tab to execute the function in.
+   * @returns {Promise<{audioinput: {label: string, deviceId: string}[], audiooutput: {label: string, deviceId: string}[], videoinput: {label: string, deviceId: string}[]}>} The result of the function execution or null if failed.
+   * @nothrows If the tab is not found or the script fails to execute, this function will not throw an error.
+   */
+  enumerateDevices: async function (tab) {
+    return await SelectAudio.executeInTab(tab, () => {
       return AUDIO_EnumerateDevices();
     });
   },
 
+  /**
+   * Select an audio device in the context of a specific tab.
+   * @param {tabs.Tab|number|any} tab The tab to execute the function in.
+   * @param {string} label The label of the audio device to select.
+   * @param {string} id The ID of the audio device to select.
+   * @param {boolean} saveAsManual Whether to save the device selection as manual.
+   * @returns {Promise<[true, string, string]|[false, null, null]>} The result of the function execution or null if failed.
+   * @nothrows If the tab is not found or the script fails to execute, this function will not throw an error.
+   */
   selectDevice: async function (tab = null, label = "", id = "", saveAsManual = true) {
     const resolvedTab = await Helpers.resolveTab(tab);
+    if (!resolvedTab) return [false, null, null];
+
     // Check if we have stored another id for this tab
     if (label && id) {
       const storedId = Helpers.get("deviceId_per_tab_" + resolvedTab.id + label, null);
@@ -224,6 +286,13 @@ const SelectAudio = {
     return result;
   },
 
+  /**
+   * Automatically select an audio device for the given tab.
+   * @param {tabs.Tab|number|any} tab The tab to execute the function in.
+   * @returns {Promise<boolean>} True if a device was automatically selected, false otherwise.
+   * 
+   * @note Automatic select based on user settings.
+   */
   autoSelectDevice: async function (tab) {
     if (!tab) return false;
     if (Helpers.has("manualAudioDevice", tab.id)) {
@@ -231,18 +300,16 @@ const SelectAudio = {
       return false;
     }
 
-    return await Helpers.getStorageValue(DATA_PATTERNS, true).then((data) => {
+    return await Helpers.getStorageValue(DATA_PATTERNS, []).then((data) => {
       if (data && data.length > 0) {
         for (let i = 0; i < data.length; i++) {
           const pattern = data[i];
           if (!pattern.urlPattern || !pattern.audioOutput || pattern.audioOutput === "Default") continue;
-          const urlPattern = new RegExp("/" + pattern.urlPattern.replaceAll("/", "\\/") + "/", "i");
+          const urlPattern = Helpers.wildcardToRegExp(pattern.urlPattern);
           // Check if the tab URL matches the pattern
-          if (tab.url.match(urlPattern)) {
-            if (pattern.audioOutput && pattern.audioOutput !== "Default") {
-              SelectAudio.selectDevice(tab, pattern.audioOutput, pattern.audioOutputId, false);
-              return true;
-            }
+          if (urlPattern.test(tab.url)) {
+            SelectAudio.selectDevice(tab, pattern.audioOutput, pattern.audioOutputId, false);
+            return true;
           }
         }
       }
@@ -251,7 +318,9 @@ const SelectAudio = {
   }
 };
 
-
+/**
+ * Manage meet tabs and their audio settings.
+ */
 class MeetTabsManager {
   constructor(name, url, script) {
     this.name = name;
@@ -270,10 +339,19 @@ class MeetTabsManager {
     return "MeetSupportScript_" + this.key();
   }
 
+  /**
+   * Check if the current meet tabs manager is enabled
+   * @returns {boolean} - True if enabled, false otherwise
+   */
   isEnabled() {
     return this.enabled;
   }
 
+  /**
+   * Set the enabled state of the current meet tabs manager
+   * @param {boolean} enabled - True to enable, false to disable
+   * @noreturn
+   */
   setEnabled(enabled) {
     if (this.enabled === !!enabled)
     {
@@ -324,6 +402,10 @@ class MeetTabsManager {
     }
   }
 
+  /**
+   * Check if the current meet tabs manager is should be enabled and enable/disable it
+   * @returns {Promise<boolean>} - True if enabled, false otherwise
+   */
   checkEnabled() {
     const self = this;
     return Helpers.getStorageValue(this.key(), true).then((enabled) => {
@@ -332,18 +414,25 @@ class MeetTabsManager {
     });
   }
 
-  // Check tab is this type of meet tab
-  // @param {object} tab - Tab object to check
-  // @return {boolean} - True if tab is a meet tab, false otherwise
+  /**
+   * Check if the given tab is a meet tab
+   * @param {tabs.Tab} tab - Tab object to check
+   * @returns {boolean} - True if tab is a meet tab, false otherwise
+   *
+   * @note Not resolving input tab argument.
+   */
   isTab(tab) {
     if (!this.urlRegExp) {
-      this.urlRegExp = new RegExp("/" + this.urlPattern.replaceAll("/", "\\/") + "/", "i");
+      this.urlRegExp = Helpers.wildcardToRegExp(this.urlPattern);
     }
-    return tab && tab.url && this.urlRegExp.test(tab.url);
+    return !!(tab && tab.url && this.urlRegExp.test(tab.url));
   }
 
-  // Request to get all meet tabs
-  // @return {Promise} - Promise with array of meet tabs
+  /**
+   * Query all meet tabs
+   * @returns {Promise<Array>} - Promise with array of meet tabs
+   * @nothrows
+   */
   async queryTabs() {
     try {
       return await API.tabs.query({ url: this.urlPattern });
@@ -353,13 +442,22 @@ class MeetTabsManager {
     }
   }
 
+  /**
+   * Inject the content script into the given tab
+   * @param {tabs.Tab|number|any} tab The tab identifier (ID, object, or other).
+   * @returns {Promise<boolean>} True if the script was injected successfully, false otherwise.
+   * @nothrows If the tab is not found or the script fails to inject, this function will not throw an error.
+   */
   async inject(tab) {
     return await Helpers.injectScript(tab, this.script);
   }
 
-  // Get tab info from the meet tab
-  // @param {object} tab - Tab object to get info from
-  // @return {object} - Object with tab info: { title: "string", inMeeting: true/false, micMuted: true/false, camMuted: true/false } or null
+  /**
+   * Get the state of the given meet tab
+   * @param {tabs.Tab|number|any} tab The tab identifier (ID, object, or other).
+   * @returns {Promise<{title: string,inMeeting: boolean,micMuted: boolean,camMuted: boolean}>} Promise with the tab state
+   * @nothrows If the tab is not found or the state cannot be retrieved, this function will not throw an error.
+   */
   async getState(tab) {
     return {
       title: typeof tab === "object" && tab.hasOwnProperty("title") ? tab.title : "",
@@ -369,28 +467,41 @@ class MeetTabsManager {
     };
   }
 
-  // Join the meet in the tab
-  // @param {object} tab - Tab object to join the meet in
+  /**
+   * Join the meet in the tab
+   * @param {tabs.Tab|number|any} tab The tab identifier (ID, object, or other).
+   * @returns {Promise<boolean>} True if the join was successful, false otherwise.
+   * @nothrows If the tab is not found or the join fails, this function will not throw an error.
+   */
   async join(tab) {
     return false;
   }
 
-  // Switch microphone mute state in the tab
-  // @param {object} tab - Tab object to switch microphone mute state in
-  // @return {Promise} - Promise with result of the microphone mute state after
+  /**
+   * Switch the microphone mute state in the tab
+   * @param {tabs.Tab|number|any} tab The tab identifier (ID, object, or other).
+   * @returns {Promise<boolean>} True if the mute state was successfully toggled, false otherwise.
+   * @nothrows If the tab is not found or the toggle fails, this function will not throw an error.
+   */
   async toggleMic(tab) {
     return false;
   }
 
-  // Switch camera mute state in the tab
-  // @param {object} tab - Tab object to switch camera mute state in
-  // @return {Promise} - Promise with result of the camera mute state after
+  /**
+   * Switch camera mute state in the tab
+   * @param {tabs.Tab|number|any} tab The tab identifier (ID, object, or other).
+   * @returns {Promise<boolean>} True if the mute state was successfully toggled, false otherwise.
+   * @nothrows If the tab is not found or the toggle fails, this function will not throw an error.
+   */
   async toggleCam(tab) {
     return false;
   }
 
-  // Get all meet tabs with their state
-  // @return {Promise} - Promise with array of meet tabs with their state
+  /**
+   * Query all meet tabs with their state that managed by this manager 
+   * @returns {Promise<Array>} - Promise with array of meet tabs with their state
+   * @nothrows If the tabs cannot be queried or their state cannot be retrieved, this function will not throw an error.
+   */
   async queryTabsWithState() {
     const tabs = await this.queryTabs();
     const tabsWithState = [];
@@ -405,26 +516,36 @@ class MeetTabsManager {
     return tabsWithState;
   }
 
-  // Get all meet tabs with inMeeting state
-  // @return {Promise} - Promise with array of meet tabs with inMeeting state
+  /**
+   * Get all meet tabs with inMeeting state
+   * @returns {Promise<Array>} - Promise with array of meet tabs with inMeeting state
+   * @nothrows If the tabs cannot be queried or their state cannot be retrieved, this function will not throw an error.
+   */
   async getTabsWithInMeeting() {
     const tabs = await this.queryTabsWithState();
     return tabs.filter((tab) => tab.inMeeting);
   }
 
-  // Check if we have any meet tabs with inMeeting state
-  // @return {Promise} - Promise with result of the check
+  /**
+   * Check if we have any meet tabs with inMeeting state
+   * @returns {Promise<boolean>} - Promise with result of the check
+   * @nothrows If the tabs cannot be queried or their state cannot be retrieved, this function will not throw an error.
+   */
   async hasInMeetTabs() {
     const tabs = await this.queryTabsWithState();
     return tabs.some((tab) => tab.inMeeting);
   }
 
-  // Switch to next active tab of this type meet
-  // If we have one tab where we are in meeting - switch to it,
-  // if no - check if we have focused some tab of this type meet and switch to next one
-  // if no - switch to first one
-  // if no one - do nothing
-  // @return {Promise} - Promise with result of the switch to next tab
+  /**
+   * Switch to the next active tab of this type meet
+   * @returns {Promise<boolean>} - Promise with result of the switch to next tab
+   * @nothrows If the tabs cannot be queried or their state cannot be retrieved, this function will not throw an error.
+   * 
+   * If we have one tab where we are in meeting - switch to it,
+   * if no - check if we have focused some tab of this type meet and switch to next one
+   * if no - switch to first one
+   * if no one - do nothing
+   */
   async switchToActiveOrNextTab() {
     const tabs = await this.queryTabsWithState();
     const inMeetingTabs = tabs.filter((tab) => tab.inMeeting);
@@ -436,10 +557,10 @@ class MeetTabsManager {
       // If we have one tab where we are in meeting - switch to it
       targetTab = inMeetingTabs[0];
     } else
-    if (focusedTabIndx !== -1) {
+    if (focusedTabIndx !== -1 && tabs.length > 0) {
       // If we have focused some tab of this type meet and switch to next one
-      const nextIndex = (focusedTabIndx + 1) % inMeetingTabs.length;
-      targetTab = inMeetingTabs[nextIndex];
+      const nextIndex = (focusedTabIndx + 1) % tabs.length;
+      targetTab = tabs[nextIndex];
     } else
     if (tabs.length > 0) {
       // If no - switch to first one
@@ -460,6 +581,9 @@ class MeetTabsManager {
   }
 }
 
+/**
+ * Google Meet tabs manager
+ */
 class GoogleMeetTabsManager extends MeetTabsManager {
   constructor() {
     super("GoogleMeet", "*://meet.google.com/*", "scripts/gmeet.js");
@@ -473,7 +597,7 @@ class GoogleMeetTabsManager extends MeetTabsManager {
 
   async join(tab) {
     return await Helpers.executeInTab(tab, () => {
-      return GMeet_joinMeet();
+      return GMeet_joinMeeting();
     });
   }
 
@@ -494,6 +618,10 @@ const MeetManagers = [
   new GoogleMeetTabsManager()
 ];
 
+/**
+ * Get the tab with inMeeting state
+ * @returns {Promise<[MeetTabsManager, Tab]|null>} - Promise with (manager, tab) pair if found, or null if not found
+ */
 async function GetTabWithInMeeting() {
   const allInMeetingTabs = [];
   for (const manager of MeetManagers) {
@@ -518,6 +646,12 @@ async function GetTabWithInMeeting() {
   return null;
 }
 
+/**
+ * Switch to the next active tab in the meeting
+ * @returns {Promise<boolean>} - Promise with the result of the switch
+ *
+ * @note If has tab with joined meeting - switch to it, otherwise switch to next one opened meeting tab
+ */
 async function MeetSwitchToNextTab() {
   for (const manager of MeetManagers) {
     if (!manager.isEnabled()) continue;
@@ -547,21 +681,43 @@ async function MeetSwitchToNextTab() {
   return false;
 }
 
+/**
+ * Join the meeting in the current tab
+ * @returns {Promise<boolean>} - Promise with the result of the join
+ *
+ * @note If no one currently in meeting and exactly one not in meeting -> join it
+ */
 async function MeetJoin() {
-  const allTabs = MeetManagers.map(async (manager) => (manager.isEnabled() ? await manager.queryTabsWithState() : []).map((tab) => [manager, tab])).flat(1);
-  const inMeetTab = allTabs.find((tab) => tab[1].inMeeting);
-  const notInMeetingTabs = allTabs.filter((tab) => !tab[1].inMeeting);
-  if (!inMeetTab && notInMeetingTabs.length === 1) {
-    if (notInMeetingTabs[0].join(notInMeetingTabs[1])) {
-      Helpers.focusTab(notInMeetingTabs[1], true);
+  // Collect (manager, tab) pairs with state
+  const pairsArrays = await Promise.all(
+    MeetManagers.map(async (manager) => {
+      if (!manager.isEnabled()) return [];
+      const tabs = await manager.queryTabsWithState();
+      return tabs.map(t => [manager, t]);
+    })
+  );
+  const allPairs = pairsArrays.flat();
+  const inMeeting = allPairs.filter(p => p[1].inMeeting);
+  const notInMeeting = allPairs.filter(p => !p[1].inMeeting);
+
+  // If no one currently in meeting and exactly one not in meeting -> join it
+  if (inMeeting.length === 0 && notInMeeting.length === 1) {
+    const [manager, tab] = notInMeeting[0];
+    const joined = await manager.join(tab);
+    if (joined) {
+      await Helpers.focusTab(tab, true);
       return true;
     }
-    return false;
   }
-
   return false;
 }
 
+/**
+ * Toggle the microphone in the current meeting tab
+ * @returns {Promise<boolean>} - Promise with the result of the toggle
+ *
+ * @note Works only if one tab is currently in a meeting exists
+ */
 async function MeetToggleMuteMicrophone() {
   const tab = await GetTabWithInMeeting();
   if (tab) {
@@ -570,6 +726,12 @@ async function MeetToggleMuteMicrophone() {
   return false;
 }
 
+/**
+ * Toggle the camera in the current meeting tab
+ * @returns {Promise<boolean>} - Promise with the result of the toggle
+ *
+ * @note Works only if one tab is currently in a meeting exists
+ */
 async function MeetToggleMuteCamera() {
   const tab = await GetTabWithInMeeting();
   if (tab) {
@@ -578,6 +740,11 @@ async function MeetToggleMuteCamera() {
   return false;
 }
 
+/**
+ * Inject the meeting content script into the specified tab
+ * @param {tabs.Tab|number|any} tab 
+ * @returns {Promise<boolean>} - Promise with the result of the injection
+ */
 async function injectMeetContentScript(tab) {
   for (const manager of MeetManagers) {
     if (!manager.isEnabled()) continue;
@@ -622,15 +789,17 @@ API.commands.onCommand.addListener((command) => {
 // Also - we want to remember if manually selected device for some tab
 API.tabs.onUpdated.addListener(
   (tabId, changeInfo, tab) => {
-    if (tab.url.indexOf("http") !== 0) {
-      return;
-    }
+    if (!tab?.url || !tab.url.startsWith("http")) return;
 
     if (changeInfo?.status === "complete") {
+      // Check if it is a meeting tab and inject manager code if it is
       injectMeetContentScript(tab);
-    }
-
-    if (changeInfo?.audible) {
+      // Here we also track tabs with autoplay
+      if (tab.audible) {
+        SelectAudio.autoSelectDevice(tab);
+      }
+    } else if (changeInfo?.audible) {
+      // And here - if tab becomes audible
       SelectAudio.autoSelectDevice(tab);
     }
   }
@@ -644,3 +813,26 @@ API.tabs.onRemoved.addListener(
 
 // Listen for settings (local storage) changes
 API.storage.local.onChanged.addListener(onSettingsChange);
+
+// On install extension
+API.runtime.onInstalled.addListener((details) => {
+  const manifest = chrome.runtime.getManifest();
+  const currentVersion = manifest.version;
+
+  if (details.reason === 'update' && details.previousVersion !== currentVersion) {
+    console.log(`Extension updated from ${details.previousVersion} to ${currentVersion}`);
+    // Handle extension update
+    // ...
+  }
+
+  if (details?.temporary) {
+    // Handle temporary installation
+    // ...
+    return;
+  }
+
+  if (details.reason === 'install') {
+    // Show options page
+    API.runtime.openOptionsPage();
+  }
+});

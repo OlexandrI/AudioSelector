@@ -46,8 +46,8 @@
       color: var(--fg);
       font-family: sans-serif;
       margin: 0 auto;
-      padding: 20px;
-      max-width: 900px;
+      padding: 24px 36px;
+      max-width: 1400px;
       line-height: 1.4;
     }
 
@@ -107,9 +107,20 @@
       font-weight: 600;
     }
 
+    table tr td:last-child:has(input[type="text"]),
+    table tr td:last-child:has(select) {
+      padding-right: 0px;
+    }
+
+    table tr td:first-child:has(input[type="text"]),
+    table tr td:first-child:has(select) {
+      padding-left: 0px;
+    }
+
     /* 5) Column widths */
     .field-state {
       width: 36px;
+      text-align: center;
     }
 
     .field-enabled {
@@ -131,6 +142,7 @@
       border-radius: 4px;
       background: var(--bg);
       color: var(--fg);
+      box-sizing: border-box;
     }
 
     input[type="checkbox"] {
@@ -211,6 +223,7 @@
     /* 9) State */
     tbody td.state {
       font-size: 1.25em;
+      text-align: center;
     }
 
     .state-ok {
@@ -259,7 +272,7 @@
       </tbody>
     </table>
     <button id="keyboard-shortcut-reset" class="btn reset hide-on-chrome">Reset to Default</button>
-    <button id="keyboard-shortcut-settings" class="btn openpage hide-on-chrome">Open in shortcuts settings</button>
+    <button id="keyboard-shortcut-settings" class="btn openpage">Open in shortcuts settings</button>
   </div>
 
   <div class="section">
