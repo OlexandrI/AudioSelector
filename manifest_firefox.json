@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Audio Selector",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Allows you to change the audio output device for tabs.",
   "homepage_url": "https://github.com/OlexandrI/AudioSelector/",
   "icons": {
@@ -29,19 +29,19 @@
       "suggested_key": {
         "default": "Ctrl+Shift+G"
       },
-      "description": "Switch to the next google meet tab"
+      "description": "Switch to the next meet tab"
     },
     "meet-join": {
-      "description": "Join the meeting if only one tab is open and switch to it"
+      "description": "Join the meeting switch to it (if have only one meet tab)"
     },
     "meet-toggle-microphone": {
       "suggested_key": {
         "default": "Alt+Shift+G"
       },
-      "description": "Mute/Unmute the microphone for the active google meet tab (without switching)"
+      "description": "Mute/Unmute the microphone for the active meet tab (without switching)"
     },
     "meet-toggle-camera": {
-      "description": "Mute/Unmute the camera for the active google meet tab (without switching)"
+      "description": "Mute/Unmute the camera for the active meet tab (without switching)"
     }
   },
   "background": {

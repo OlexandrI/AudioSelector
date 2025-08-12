@@ -173,6 +173,24 @@ const Helpers = {
   },
 
   /**
+   * Set a value in storage.
+   * @param {string} key The key to set.
+   * @param {any} value The value to set.
+   * @returns {Promise<any>} The set value or null if failed.
+   * @nothrows If the key is invalid or the value cannot be set, this function will not throw an error.
+   */
+  setStorageValue: async function (key, value) {
+    try {
+      await API.storage.local.set({ [key]: value });
+      return value;
+    } catch (error) {
+      console.error(`Error setting storage value for key ${key}: ${error}`);
+    }
+
+    return null;
+  },
+
+  /**
    * Convert a wildcard pattern to a regular expression.
    * @param {string} pattern The wildcard pattern to convert.
    * @returns {RegExp} The resulting regular expression.
@@ -288,33 +306,33 @@ const SelectAudio = {
 
   /**
    * Automatically select an audio device for the given tab.
-   * @param {tabs.Tab|number|any} tab The tab to execute the function in.
+   * @param {tabs.Tab} tab The tab to execute the function in.
    * @returns {Promise<boolean>} True if a device was automatically selected, false otherwise.
    * 
    * @note Automatic select based on user settings.
    */
   autoSelectDevice: async function (tab) {
-    if (!tab) return false;
+    if (!tab?.url) return false;
     if (Helpers.has("manualAudioDevice", tab.id)) {
       console.info(`Tab ${tab.id} has manual audio device set. Skipping auto selection.`);
       return false;
     }
 
-    return await Helpers.getStorageValue(DATA_PATTERNS, []).then((data) => {
-      if (data && data.length > 0) {
-        for (let i = 0; i < data.length; i++) {
-          const pattern = data[i];
-          if (!pattern.urlPattern || !pattern.audioOutput || pattern.audioOutput === "Default") continue;
-          const urlPattern = Helpers.wildcardToRegExp(pattern.urlPattern);
-          // Check if the tab URL matches the pattern
-          if (urlPattern.test(tab.url)) {
-            SelectAudio.selectDevice(tab, pattern.audioOutput, pattern.audioOutputId, false);
-            return true;
-          }
+    const data = await Helpers.getStorageValue(DATA_PATTERNS, []);
+    if (Array.isArray(data) && data.length > 0) {
+      for (const pattern of data) {
+        if (!pattern.urlPattern || !pattern.audioOutput || pattern.audioOutput === "Default") continue;
+        const urlPattern = Helpers.wildcardToRegExp(pattern.urlPattern);
+        // Check if the tab URL matches the pattern
+        if (urlPattern.test(tab.url)) {
+          // Await the selection and stop after the first match
+          await SelectAudio.selectDevice(tab, pattern.audioOutput, pattern.audioOutputId, false);
+          return true;
         }
       }
-      return false;
-    });
+    }
+
+    return false;
   }
 };
 
@@ -328,6 +346,7 @@ class MeetTabsManager {
     this.script = script;
     this.urlRegExp = null;
     this.enabled = false;
+    this._enablingInProgress = false;
     this.checkEnabled();
   }
 
@@ -348,20 +367,31 @@ class MeetTabsManager {
   }
 
   /**
-   * Set the enabled state of the current meet tabs manager
+   * Activate current meet tabs manager
    * @param {boolean} enabled - True to enable, false to disable
    * @noreturn
    */
-  setEnabled(enabled) {
-    if (this.enabled === !!enabled)
+  async setActive(enabled) {
+    if (this.enabled === !!enabled || this._enablingInProgress)
     {
-      return;
+      // Wait for the current operation to finish
+      await new Promise(resolve => {
+        const check = () => {
+          if (!this._enablingInProgress) {
+            resolve();
+          } else {
+            setTimeout(check, 100);
+          }
+        };
+        check();
+      });
     }
 
     const self = this;
+    this._enablingInProgress = true;
     // If enabled - register content script
     if (enabled) {
-      API.scripting.getRegisteredContentScripts({ids: [self.id()]}).then((registered) => {
+      await API.scripting.getRegisteredContentScripts({ids: [self.id()]}).then((registered) => {
         if (registered.length > 0) {
           const registeredIndx = registered.findIndex((script) => script.id === self.id());
           if (registeredIndx !== -1) {
@@ -383,21 +413,26 @@ class MeetTabsManager {
           self.enabled = true;
         }).catch((error) => {
           console.error(`Error registering content script for ${self.key()}: ${error}`);
+          self.enabled = false;
+        }).finally(() => {
+            self._enablingInProgress = false;
         });
       });
     } else {
       self.enabled = false;
-      API.scripting.getRegisteredContentScripts({ids: [self.id()]}).then((registered) => {
+      await API.scripting.getRegisteredContentScripts({ids: [self.id()]}).then(async (registered) => {
         if (registered.length > 0) {
           const registeredIndx = registered.findIndex((script) => script.id === self.id());
           if (registeredIndx !== -1) {
-            API.scripting.unregisterContentScripts({ids: [self.id()]}).then(() => {
+            await API.scripting.unregisterContentScripts({ids: [self.id()]}).then(() => {
               console.info(`Content script ${self.id()} unregistered.`);
             }).catch((error) => {
               console.error(`Error unregistering content script for ${self.key()}: ${error}`);
             });
           }
         }
+      }).finally(() => {
+          self._enablingInProgress = false;
       });
     }
   }
@@ -406,12 +441,25 @@ class MeetTabsManager {
    * Check if the current meet tabs manager is should be enabled and enable/disable it
    * @returns {Promise<boolean>} - True if enabled, false otherwise
    */
-  checkEnabled() {
+  async checkEnabled() {
     const self = this;
-    return Helpers.getStorageValue(this.key(), true).then((enabled) => {
-      self.setEnabled(enabled);
+    return await Helpers.getStorageValue(this.key(), true).then((enabled) => {
+      self.setActive(enabled);
       return self.enabled;
     });
+  }
+
+  /**
+   * Set the enabled state of the current meet tabs manager
+   * @param {boolean} enabled - True to enable, false to disable
+   * @noreturn
+   */
+  async setEnabled(enabled) {
+    const self = this;
+    await Helpers.setStorageValue(this.key(), enabled).catch((error) => {
+      console.error(`Error setting storage value for ${self.key()}: ${error}`);
+    });
+    //await this.setActive(enabled);
   }
 
   /**
@@ -548,33 +596,30 @@ class MeetTabsManager {
    */
   async switchToActiveOrNextTab() {
     const tabs = await this.queryTabsWithState();
+    if (tabs.length === 0) {
+      console.info(`No active meet tabs found for ${this.name} manager.`);
+      return false;
+    }
+
     const inMeetingTabs = tabs.filter((tab) => tab.inMeeting);
     const focusedTab = await Helpers.activeTab();
-    const focusedTabIndx = focusedTab ? tabs.findIndex((tab) => tab.id === focusedTab.id) : -1;
+    // Determine which list of tabs to use for cycling
+    const cycleList = inMeetingTabs.length > 0 ? inMeetingTabs : tabs;
+    const focusedIndexInCycle = focusedTab ? cycleList.findIndex((tab) => tab.id === focusedTab.id) : -1;
 
-    let targetTab = null;
-    if (inMeetingTabs.length === 1) {
-      // If we have one tab where we are in meeting - switch to it
-      targetTab = inMeetingTabs[0];
-    } else
-    if (focusedTabIndx !== -1 && tabs.length > 0) {
-      // If we have focused some tab of this type meet and switch to next one
-      const nextIndex = (focusedTabIndx + 1) % tabs.length;
-      targetTab = tabs[nextIndex];
-    } else
-    if (tabs.length > 0) {
-      // If no - switch to first one
-      targetTab = tabs[0];
+    let targetTab;
+    if (focusedIndexInCycle !== -1) {
+      // If a tab from the cycle list is focused, get the next one
+      const nextIndex = (focusedIndexInCycle + 1) % cycleList.length;
+      targetTab = cycleList[nextIndex];
+    } else {
+      // Otherwise, just pick the first tab in the prioritized list
+      targetTab = cycleList[0];
     }
     
-    if (targetTab === focusedTab) {
-      console.info("Selected tab is already focused.");
+    if (targetTab && focusedTab && targetTab.id === focusedTab.id) {
+      console.info(`Selected ${this.name} tab is already focused.`);
       return true;
-    }
-
-    if (!targetTab) {
-      console.info("No active meet tabs found.");
-      return false;
     }
 
     return await Helpers.focusTab(targetTab, true);
@@ -617,6 +662,15 @@ class GoogleMeetTabsManager extends MeetTabsManager {
 const MeetManagers = [
   new GoogleMeetTabsManager()
 ];
+/**
+ * Get a meet manager by name
+ * @param {string} name 
+ * @returns {MeetTabsManager|null}
+ */
+MeetManagers.get = function (name) {
+  const manager = MeetManagers.find(manager => manager.name === name);
+  return manager || null;
+}
 
 /**
  * Get the tab with inMeeting state
@@ -653,32 +707,38 @@ async function GetTabWithInMeeting() {
  * @note If has tab with joined meeting - switch to it, otherwise switch to next one opened meeting tab
  */
 async function MeetSwitchToNextTab() {
+  // Consolidate all tabs from all enabled managers
+  let allTabs = [];
   for (const manager of MeetManagers) {
-    if (!manager.isEnabled()) continue;
-    const hasInMeetTabs = await manager.hasInMeetTabs();
-    if (!hasInMeetTabs) {
-      continue;
-    }
-    const switched = await manager.switchToActiveOrNextTab();
-    if (switched) {
-      return true;
+    if (manager.isEnabled()) {
+      allTabs.push(...await manager.queryTabsWithState());
     }
   }
 
-  for (const manager of MeetManagers) {
-    if (!manager.isEnabled()) continue;
-    const tabs = await manager.queryTabs();
-    if (tabs.length < 1) {
-      continue;
-    }
-    // @TODO: When reach end of one managers tabs - go trough next manager
-    const switched = await manager.switchToActiveOrNextTab();
-    if (switched) {
-      return true;
-    }
+  if (allTabs.length === 0) {
+    console.info("No meet tabs found to switch to.");
+    return false;
   }
 
-  return false;
+  const inMeetingTabs = allTabs.filter(t => t.inMeeting);
+  const cycleList = inMeetingTabs.length > 0 ? inMeetingTabs : allTabs;
+
+  const focusedTab = await Helpers.activeTab();
+  const focusedIndex = focusedTab ? cycleList.findIndex(t => t.id === focusedTab.id) : -1;
+
+  let targetTab;
+  if (focusedIndex !== -1) {
+    targetTab = cycleList[(focusedIndex + 1) % cycleList.length];
+  } else {
+    targetTab = cycleList[0];
+  }
+
+  if (targetTab && focusedTab && targetTab.id === focusedTab.id) {
+    console.info("Selected tab is already focused.");
+    return true;
+  }
+
+  return await Helpers.focusTab(targetTab, true);
 }
 
 /**
@@ -761,9 +821,9 @@ function onSettingsChange(changes) {
   const changedItems = Object.keys(changes);
 
   for (const item of changedItems) {
-    if (item.startsWith("enable")) for (const manager of MeetManagers) {
+    for (const manager of MeetManagers) {
       if (manager.key() === item) {
-        manager.setEnabled(changes[item].newValue);
+        manager.setActive(changes[item].newValue);
       }
     }
   }
@@ -832,6 +892,9 @@ API.runtime.onInstalled.addListener((details) => {
   }
 
   if (details.reason === 'install') {
+    // Enable GoogleMeet manager by default
+    const gmeet = MeetManagers.get("GoogleMeet");
+    if (gmeet) gmeet.setEnabled(true);
     // Show options page
     API.runtime.openOptionsPage();
   }

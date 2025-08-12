@@ -1,5 +1,6 @@
 const API = (typeof browser !== "undefined") ? browser : chrome; // For compatibility with Chrome and Firefox
 const IS_CHROME_ENV = typeof chrome !== "undefined" && typeof browser === "undefined";
+const IS_OPERA = typeof opr !== "undefined";
 const DATA_PATTERNS = "patterns";
 
 
@@ -102,8 +103,21 @@ class AudioDevicePatternManager extends TableHelper {
     static getInstance() {
         if (!AudioDevicePatternManager.instance) {
             AudioDevicePatternManager.instance = new AudioDevicePatternManager();
+            AudioDevicePatternManager.instance.devices = {audiooutput: []};
         }
         return AudioDevicePatternManager.instance;
+    }
+
+    updateDevices() {
+        const self = this;
+        AUDIO_EnumerateDevices().then((devices) => {
+            if (devices.audiooutput.length > 0) {
+                self.devices = devices;
+                self.updateOptions();
+            }
+        }).catch((error) => {
+            console.error("Error updating devices:", error);
+        });
     }
 
     constructor(tableElement) {
@@ -331,13 +345,14 @@ async function OpenShortcutsPage() {
         API.commands.openShortcutSettings();
     } else if (IS_CHROME_ENV) {
         // Check - if tab opened - switch to it, otherwise create a new one
+        const shortcutsUrl = (IS_OPERA) ? "opera://extensions/shortcuts" : "chrome://extensions/shortcuts";
         try {
-            const existingTab = await API.tabs.query({ url: "chrome://extensions/shortcuts" });
+            const existingTab = await API.tabs.query({ url: shortcutsUrl });
             if (existingTab.length > 0) {
                 await API.windows.update(existingTab[0].windowId, { focused: true });
                 await API.tabs.update(existingTab[0].id, { active: true });
             } else {
-                await API.tabs.create({ url: "chrome://extensions/shortcuts" });
+                await API.tabs.create({ url: shortcutsUrl });
             }
         } catch (error) {
             console.error("Error opening shortcuts page:", error);
@@ -433,8 +448,7 @@ document.addEventListener("DOMContentLoaded", updateUI);
 if (navigator?.mediaDevices)
 {
     navigator.mediaDevices.ondevicechange = (event) => {
-        if (PatternsManager) {
-            PatternsManager.updateDevices();
-        }
+        // Update devices list
+        AudioDevicePatternManager.getInstance().updateDevices();
     };
 }
