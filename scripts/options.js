@@ -214,7 +214,12 @@ class MeetSupportRow extends TableRow {
         const key = this.key();
         const self = this;
         const cb = () => {
-            return API.storage.local.set({ [key]: self.data.enabled });
+            return API.storage.local.set({ [key]: self.data.enabled }).then(() => {
+                return true;
+            }).catch((error) => {
+                console.error("Error saving meet support data:", error);
+                return false;
+            });
         };
 
         if (this.hasPermission()) {
@@ -324,6 +329,19 @@ async function ResetAllShortcuts() {
 async function OpenShortcutsPage() {
     if (API.commands && typeof API.commands.openShortcutSettings === "function") {
         API.commands.openShortcutSettings();
+    } else if (IS_CHROME_ENV) {
+        // Check - if tab opened - switch to it, otherwise create a new one
+        try {
+            const existingTab = await API.tabs.query({ url: "chrome://extensions/shortcuts" });
+            if (existingTab.length > 0) {
+                await API.windows.update(existingTab[0].windowId, { focused: true });
+                await API.tabs.update(existingTab[0].id, { active: true });
+            } else {
+                await API.tabs.create({ url: "chrome://extensions/shortcuts" });
+            }
+        } catch (error) {
+            console.error("Error opening shortcuts page:", error);
+        }
     } else {
         console.warn("Shortcut settings API is not available.");
     }
@@ -397,6 +415,15 @@ async function updateUI() {
     ShowAllShortcuts();
     btnBind("#keyboard-shortcut-reset", ResetAllShortcuts);
     btnBind("#keyboard-shortcut-settings", OpenShortcutsPage);
+    if (typeof API.commands.onChanged !== "undefined") {
+        if (!API.commands.onChanged.hasListener(ShowAllShortcuts)) {
+            API.commands.onChanged.addListener(ShowAllShortcuts);
+        }
+    } else {
+        window.addEventListener("focus", function() {
+            ShowAllShortcuts();
+        });
+    }
 }
 
 /**
