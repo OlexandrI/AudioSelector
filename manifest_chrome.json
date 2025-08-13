@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Audio Selector",
   "version": "0.3.3",
-  "description": "Audio Selector is a powerful browser extension that gives you granular control over your audio output devices and streamlines your online meetings. Easily route each browser tab's audio to any device you choose, and manage your video calls with a suite of intuitive keyboard shortcuts.",
+  "description": "A powerful tool to route browser tab audio to any output device and manage your online meetings with ease.",
   "homepage_url": "https://github.com/OlexandrI/AudioSelector/",
   "icons": {
     "32": "icons/icon-32.png",
