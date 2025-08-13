@@ -58,14 +58,20 @@ Alternatively, you can load the extension as an unpacked extension in your brows
 ### **v0.3.2** - 2025-08-13
 
 * **Added**
-  * `Open in shortcuts settings` button enabled for Chrome.
-  * Added watching for shortcut changes to update the options page automatically.
-  * The options page now opens automatically upon installation.
+  * Added support for the **Opera** browser.
+  * A banner image has been added.
+  * Google Meet support is now enabled by default upon installation.
+  * The `Open in shortcuts settings` button for Chrome is now enabled.
+  * The extension now watches for shortcut changes to automatically update and display them on the options page.
+  * The options page opens automatically upon installation.
+* **Changed**
+  * "google meet" was replaced with "meet" in the shortcut descriptions.
 * **Fixed**
-  * Corrected issues with input field widths on the options page.
-  * Fixed the logic for automatically selecting an audio device for tabs with auto-play.
-  * Addressed minor potential issues and fixed the joining Google Meet shortcut.
-  * Fixed updating the state in the Meet supports table.
+  * The auto-selection of audio devices for tabs with auto-play has been fixed.
+  * Several minor potential issues were addressed.
+  * The width of input fields on the options page was corrected.
+  * The updating of the state in the Meet supports table has been fixed.
+  * The shortcut for joining Google Meet was fixed.
 
 [View full changelog](Changelog.md)
 
