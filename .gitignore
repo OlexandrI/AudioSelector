@@ -1,3 +1,9 @@
 
+# Manifest file
 manifest.json
 
+# Visual Studio Code settings
+.vscode/
+
+# Distro folder
+dist/

@@ -280,6 +280,9 @@ function AUDIO_EnumerateDevices() {
 
 async function AUDIO_WatchMediaElement(element, id) {
   if (element instanceof HTMLMediaElement) {
+    // Check if the sinkId is different
+    if (element.sinkId !== id) await element.setSinkId(id);
+
     // Always store selected sinkId
     element.setAttribute("data-audio-selector-sink-id", id);
 
@@ -300,9 +303,6 @@ async function AUDIO_WatchMediaElement(element, id) {
     element.addEventListener("playing", () => {
       element.setSinkId(element.getAttribute("data-audio-selector-sink-id"));
     });
-
-    // Check if the sinkId is different
-    if (element.sinkId !== id) await element.setSinkId(id);
   }
 }
 

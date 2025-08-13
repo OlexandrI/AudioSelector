@@ -150,7 +150,7 @@ function isVisible(selector) {
     const elements = resolveElements(selector);
     if (!(elements instanceof Array)) return false;
     for (let i = 0; i < elements.length; i++) {
-        const el = elements[i];
+        let el = elements[i];
         // Walk up the tree to ensure no ancestor hides the element
         while (el && el instanceof HTMLElement) {
             const cs = window.getComputedStyle(el);

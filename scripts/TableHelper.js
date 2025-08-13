@@ -577,6 +577,30 @@ class TableRow {
         this._scope_updateState = false;
     }
 
+    updateOptions() {
+        const elements = this.getElements();
+        for (const key in elements) {
+            const elem = elements[key];
+            const type = this.schema.getFieldInfo(key).type;
+            if (elem && elem.tagName === "SELECT" && type === "select") {
+                const fieldValue = this.get(key);
+                const options = this.options(key);
+                while (elem.firstChild) elem.removeChild(elem.firstChild);
+                if (options) {
+                    options.forEach((option) => {
+                        const opt = document.createElement("option");
+                        opt.value = option?.value ?? option?.label ?? String(option);
+                        opt.textContent = option?.label ?? option?.value ?? String(option);
+                        if (opt.value === fieldValue) {
+                            opt.selected = true;
+                        }
+                        elem.appendChild(opt);
+                    });
+                }
+            }
+        }
+    }
+
     // Return promise
     // Implement it in subclass
     save_implementation() {
@@ -739,6 +763,10 @@ class TableHelper {
                 this.tableElement.classList.remove("dirty");
             }
         }
+    }
+
+    updateOptions() {
+        this.rows.forEach((row) => row.updateOptions());
     }
 
     loadAll() {
