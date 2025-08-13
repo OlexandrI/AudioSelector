@@ -55,6 +55,13 @@ Alternatively, you can load the extension as an unpacked extension in your brows
 
 ## 📜 **Changelog**
 
+### **v0.3.3** - 2025-08-13
+
+* **Added**
+  * Powershell script that creates archives for each browse.
+* **Fixed**
+  * Not working changing output device on active media.
+
 ### **v0.3.2** - 2025-08-13
 
 * **Added**

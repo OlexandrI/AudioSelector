@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.3
 
+### **v0.3.3** - 2025-08-13
+
+- **Added**
+  - Powershell script that creates archives for each browse.
+- **Fixed**
+  - Not working changing output device on active media.
+
 ### **v0.3.2** - 2025-08-13
 
 - **Added**
