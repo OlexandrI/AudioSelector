@@ -1,6 +1,6 @@
 # Audio Selector
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge)](LICENSE)
 [![Firefox](https://img.shields.io/badge/Firefox-FF7139?style=for-the-badge&logo=Firefox-Browser&logoColor=white)](https://addons.mozilla.org/uk/firefox/addon/audio-selector/)
 [![Google Chrome](https://img.shields.io/badge/Google%20Chrome-4285F4?style=for-the-badge&logo=GoogleChrome&logoColor=white)](https://chromewebstore.google.com/detail/audio-selector/nladhmjchmoeoadjnckmoemmapkjhalb)
 ![Opera](https://img.shields.io/badge/Opera-FF1B2D?style=for-the-badge&logo=Opera&logoColor=white)
@@ -45,7 +45,7 @@ You can install the extension from the official stores or load it manually:
 Alternatively, you can load the extension as an unpacked extension in your browser*.
 
 * First, clone or download this repository.
-* If a browser-specific manifest file exists (e.g., `manifest.json.opera`), you may need to rename it to `manifest.json` before loading.
+* If a browser-specific manifest file exists (e.g., `manifest_opera.json`), you may need to make copy and rename it to `manifest.json` before loading.
 * Install it as developer. Instructions for:
 [Chrome](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked) |
 [Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/) |
