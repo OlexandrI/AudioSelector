@@ -55,6 +55,13 @@ Alternatively, you can load the extension as an unpacked extension in your brows
 
 ## 📜 **Changelog**
 
+### **v0.3.4** - 2025-09-05
+
+* **Changed**
+  * Default shortcut of action "Switch to the next meet tab" for Firefox
+* **Fixed**
+  * Not working meets support logic that enabled before start extension.
+
 ### **v0.3.3** - 2025-08-13
 
 * **Added**

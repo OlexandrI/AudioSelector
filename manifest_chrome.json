@@ -1,16 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Audio Selector",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "A powerful tool to route browser tab audio to any output device and manage your online meetings with ease.",
   "homepage_url": "https://github.com/OlexandrI/AudioSelector/",
   "icons": {
+    "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
-    "64": "icons/icon-64.png",
-    "96": "icons/icon-96.png",
-    "128": "icons/icon-128.png",
-    "256": "icons/icon-256.png"
+    "128": "icons/icon-128.png"
   },
   "permissions": [
     "storage",

@@ -372,12 +372,13 @@ class MeetTabsManager {
    * @noreturn
    */
   async setActive(enabled) {
+    const self = this;
     if (this.enabled === !!enabled || this._enablingInProgress)
     {
       // Wait for the current operation to finish
       await new Promise(resolve => {
         const check = () => {
-          if (!this._enablingInProgress) {
+          if (!self._enablingInProgress) {
             resolve();
           } else {
             setTimeout(check, 100);
@@ -387,20 +388,20 @@ class MeetTabsManager {
       });
     }
 
-    const self = this;
     this._enablingInProgress = true;
     // If enabled - register content script
     if (enabled) {
-      await API.scripting.getRegisteredContentScripts({ids: [self.id()]}).then((registered) => {
+      await API.scripting.getRegisteredContentScripts({ids: [self.id()]}).then(async (registered) => {
         if (registered.length > 0) {
           const registeredIndx = registered.findIndex((script) => script.id === self.id());
           if (registeredIndx !== -1) {
             console.info(`Content script ${self.id()} is already registered.`);
+            self.enabled = true;
             return;
           }
         }
 
-        API.scripting.registerContentScripts([
+        await API.scripting.registerContentScripts([
           {
             id: self.id(),
             matches: [this.urlPattern],
@@ -414,9 +415,9 @@ class MeetTabsManager {
         }).catch((error) => {
           console.error(`Error registering content script for ${self.key()}: ${error}`);
           self.enabled = false;
-        }).finally(() => {
-            self._enablingInProgress = false;
         });
+      }).finally(() => {
+          self._enablingInProgress = false;
       });
     } else {
       self.enabled = false;
